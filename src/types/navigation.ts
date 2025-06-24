@@ -42,15 +42,12 @@ export type AppStackParamList = {
   };
   IndividualChat: {
     chatId: string;
-    otherUser: {
-      uid: string;
-      email: string;
-      username: string;
-      displayName?: string;
-      profilePicture?: string;
-      isOnline: boolean;
-    };
+    username: string;
   };
+  GroupChat: {
+    groupId: string;
+  };
+  CreateGroup: undefined;
   StoryViewer: {
     storyId: string;
     stories: Array<{

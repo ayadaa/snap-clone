@@ -13,7 +13,9 @@ import {
   serverTimestamp,
   onSnapshot,
   Timestamp,
-  writeBatch
+  writeBatch,
+  arrayUnion,
+  arrayRemove
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 
@@ -90,6 +92,49 @@ export interface StoryView {
   viewerId: string;
   viewedAt: Timestamp;
   snapIndex: number; // which snap in the story was viewed
+}
+
+export interface Group {
+  id: string;
+  name: string;
+  description?: string;
+  createdBy: string;
+  participants: string[];
+  admins: string[];
+  createdAt: Timestamp;
+  lastMessage?: {
+    text: string;
+    senderId: string;
+    timestamp: Timestamp;
+    type: 'text' | 'snap' | 'system';
+  };
+  settings: {
+    allowNewMembers: boolean;
+    onlyAdminsCanMessage: boolean;
+    allowSnapSharing: boolean;
+  };
+}
+
+export interface GroupMessage {
+  id: string;
+  groupId: string;
+  senderId: string;
+  text?: string;
+  snapId?: string;
+  timestamp: Timestamp;
+  readBy: Array<{
+    userId: string;
+    readAt: Timestamp;
+  }>;
+  type: 'text' | 'snap' | 'system';
+  systemMessageType?: 'member_added' | 'member_left' | 'name_changed' | 'admin_added';
+  metadata?: {
+    addedMembers?: string[];
+    removedMember?: string;
+    oldName?: string;
+    newName?: string;
+    newAdmin?: string;
+  };
 }
 
 /**
@@ -684,5 +729,338 @@ export async function deleteExpiredStories(): Promise<void> {
   } catch (error) {
     console.error('Delete expired stories error:', error);
     throw new Error('Failed to delete expired stories');
+  }
+}
+
+/**
+ * Create a new group
+ */
+export async function createGroup(
+  groupData: {
+    name: string;
+    description?: string;
+    participants: string[];
+  },
+  createdBy: string
+): Promise<string> {
+  try {
+    const groupRef = doc(collection(db, 'groups'));
+    
+    const group: Omit<Group, 'id'> = {
+      name: groupData.name,
+      ...(groupData.description && { description: groupData.description }),
+      createdBy,
+      participants: [createdBy, ...groupData.participants],
+      admins: [createdBy],
+      createdAt: serverTimestamp() as Timestamp,
+      settings: {
+        allowNewMembers: true,
+        onlyAdminsCanMessage: false,
+        allowSnapSharing: true,
+      },
+    };
+    
+    await setDoc(groupRef, group);
+    
+    // Fetch usernames for the added participants
+    const addedUsernames: string[] = [];
+    for (const userId of groupData.participants) {
+      try {
+        const userProfile = await getUserProfile(userId);
+        if (userProfile) {
+          addedUsernames.push(userProfile.username);
+        } else {
+          addedUsernames.push('Unknown User');
+        }
+      } catch (error) {
+        console.warn(`Failed to get username for user ${userId}:`, error);
+        addedUsernames.push('Unknown User');
+      }
+    }
+    
+    // Send system message about group creation with usernames
+    await sendGroupMessage(groupRef.id, {
+      senderId: createdBy,
+      type: 'system',
+      systemMessageType: 'member_added',
+      metadata: {
+        addedMembers: addedUsernames,
+      },
+    });
+    
+    return groupRef.id;
+  } catch (error) {
+    console.error('Create group error:', error);
+    throw new Error('Failed to create group');
+  }
+}
+
+/**
+ * Get user's groups
+ */
+export async function getUserGroups(userId: string): Promise<Group[]> {
+  try {
+    const groupsQuery = query(
+      collection(db, 'groups'),
+      where('participants', 'array-contains', userId),
+      orderBy('lastMessage.timestamp', 'desc')
+    );
+    
+    const groupsSnapshot = await getDocs(groupsQuery);
+    return groupsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as Group[];
+  } catch (error) {
+    console.error('Get user groups error:', error);
+    throw new Error('Failed to get user groups');
+  }
+}
+
+/**
+ * Subscribe to user's groups with real-time listener
+ */
+export function subscribeToUserGroups(
+  userId: string,
+  callback: (groups: Group[]) => void
+): () => void {
+  try {
+    const groupsQuery = query(
+      collection(db, 'groups'),
+      where('participants', 'array-contains', userId),
+      orderBy('lastMessage.timestamp', 'desc')
+    );
+    
+    return onSnapshot(groupsQuery, (snapshot) => {
+      const groups = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Group[];
+      
+      callback(groups);
+    });
+  } catch (error) {
+    console.error('Subscribe to user groups error:', error);
+    throw new Error('Failed to subscribe to user groups');
+  }
+}
+
+/**
+ * Send a message to a group
+ */
+export async function sendGroupMessage(
+  groupId: string,
+  messageData: {
+    senderId: string;
+    text?: string;
+    snapId?: string;
+    type: 'text' | 'snap' | 'system';
+    systemMessageType?: 'member_added' | 'member_left' | 'name_changed' | 'admin_added';
+    metadata?: {
+      addedMembers?: string[];
+      removedMember?: string;
+      oldName?: string;
+      newName?: string;
+      newAdmin?: string;
+    };
+  }
+): Promise<string> {
+  try {
+    const messageRef = doc(collection(db, 'groups', groupId, 'messages'));
+    
+    // Build message object without undefined fields
+    const message: any = {
+      groupId,
+      senderId: messageData.senderId,
+      timestamp: serverTimestamp() as Timestamp,
+      readBy: [{
+        userId: messageData.senderId,
+        readAt: Timestamp.now(),
+      }],
+      type: messageData.type,
+    };
+
+    // Only include fields that have values
+    if (messageData.text) {
+      message.text = messageData.text;
+    }
+    if (messageData.snapId) {
+      message.snapId = messageData.snapId;
+    }
+    if (messageData.systemMessageType) {
+      message.systemMessageType = messageData.systemMessageType;
+    }
+    if (messageData.metadata) {
+      message.metadata = messageData.metadata;
+    }
+    
+    await setDoc(messageRef, message);
+    
+    // Update group's last message
+    const groupRef = doc(db, 'groups', groupId);
+    const lastMessage = {
+      text: messageData.text || (messageData.type === 'system' ? 'System message' : 'Snap'),
+      senderId: messageData.senderId,
+      timestamp: serverTimestamp() as Timestamp,
+      type: messageData.type,
+    };
+    
+    await updateDoc(groupRef, {
+      lastMessage,
+    });
+    
+    return messageRef.id;
+  } catch (error) {
+    console.error('Send group message error:', error);
+    throw new Error('Failed to send message');
+  }
+}
+
+/**
+ * Subscribe to group messages
+ */
+export function subscribeToGroupMessages(
+  groupId: string,
+  callback: (messages: GroupMessage[]) => void
+): () => void {
+  try {
+    const messagesQuery = query(
+      collection(db, 'groups', groupId, 'messages'),
+      orderBy('timestamp', 'asc')
+    );
+    
+    return onSnapshot(messagesQuery, (snapshot) => {
+      const messages = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as GroupMessage[];
+      
+      callback(messages);
+    });
+  } catch (error) {
+    console.error('Subscribe to group messages error:', error);
+    throw new Error('Failed to subscribe to group messages');
+  }
+}
+
+/**
+ * Add members to group
+ */
+export async function addMembersToGroup(
+  groupId: string,
+  newMemberIds: string[],
+  addedBy: string
+): Promise<void> {
+  try {
+    const groupRef = doc(db, 'groups', groupId);
+    const batch = writeBatch(db);
+    
+    // Update group participants
+    batch.update(groupRef, {
+      participants: arrayUnion(...newMemberIds),
+    });
+    
+    // Send system message
+    await sendGroupMessage(groupId, {
+      senderId: addedBy,
+      type: 'system',
+      systemMessageType: 'member_added',
+      metadata: {
+        addedMembers: newMemberIds,
+      },
+    });
+    
+    await batch.commit();
+  } catch (error) {
+    console.error('Add members to group error:', error);
+    throw new Error('Failed to add members to group');
+  }
+}
+
+/**
+ * Remove member from group
+ */
+export async function removeMemberFromGroup(
+  groupId: string,
+  memberIdToRemove: string,
+  removedBy: string
+): Promise<void> {
+  try {
+    const groupRef = doc(db, 'groups', groupId);
+    
+    await updateDoc(groupRef, {
+      participants: arrayRemove(memberIdToRemove),
+      admins: arrayRemove(memberIdToRemove), // Also remove from admins if they were one
+    });
+    
+    // Get the username of the removed member
+    let removedUsername = 'Unknown User';
+    try {
+      const userProfile = await getUserProfile(memberIdToRemove);
+      if (userProfile) {
+        removedUsername = userProfile.username;
+      }
+    } catch (error) {
+      console.warn(`Failed to get username for removed user ${memberIdToRemove}:`, error);
+    }
+    
+    // Send system message
+    await sendGroupMessage(groupId, {
+      senderId: removedBy,
+      type: 'system',
+      systemMessageType: 'member_left',
+      metadata: {
+        removedMember: removedUsername, // Use username instead of UID
+      },
+    });
+  } catch (error) {
+    console.error('Remove member error:', error);
+    throw new Error('Failed to remove member');
+  }
+}
+
+/**
+ * Update group settings
+ */
+export async function updateGroupSettings(
+  groupId: string,
+  settings: Partial<Group['settings']>
+): Promise<void> {
+  try {
+    const groupRef = doc(db, 'groups', groupId);
+    await updateDoc(groupRef, {
+      settings: settings,
+    });
+  } catch (error) {
+    console.error('Update group settings error:', error);
+    throw new Error('Failed to update group settings');
+  }
+}
+
+/**
+ * Mark group messages as read
+ */
+export async function markGroupMessagesAsRead(
+  groupId: string,
+  userId: string,
+  messageIds: string[]
+): Promise<void> {
+  try {
+    const batch = writeBatch(db);
+    
+    messageIds.forEach(messageId => {
+      const messageRef = doc(db, 'groups', groupId, 'messages', messageId);
+      batch.update(messageRef, {
+        readBy: arrayUnion({
+          userId,
+          readAt: Timestamp.now(),
+        }),
+      });
+    });
+    
+    await batch.commit();
+  } catch (error) {
+    console.error('Mark group messages as read error:', error);
+    throw new Error('Failed to mark group messages as read');
   }
 } 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { AuthNavigator } from './AuthNavigator';
-import { AppStackNavigator } from './AppStackNavigator';
+import AppStackNavigator from './AppStackNavigator';
 import { useAppSelector } from '../store/hooks';
 
 /**
