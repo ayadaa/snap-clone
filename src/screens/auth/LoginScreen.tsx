@@ -1,46 +1,51 @@
 import React, { useState } from 'react';
-import { View, Text, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Screen } from '../../components/common/Screen';
 import { Input } from '../../components/common/Input';
 import { Button } from '../../components/common/Button';
-import { useAppDispatch } from '../../store/hooks';
-import { setUser } from '../../store/slices/auth.slice';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { setUser, setError, setLoading, clearError } from '../../store/slices/auth.slice';
+import { signInWithEmail } from '../../services/firebase/auth';
 import type { AuthStackParamList } from '../../types/navigation';
 
 /**
  * Login screen component for user authentication.
- * Phase 0 implementation with basic form fields and no validation.
- * Will be enhanced with Firebase authentication in later development.
+ * Integrates with Firebase Authentication for real user login.
+ * Includes proper error handling and loading states.
  */
 export function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   
   const navigation = useNavigation<any>();
   const dispatch = useAppDispatch();
+  const isLoading = useAppSelector((state) => state.auth.isLoading);
 
   const handleLogin = async () => {
-    setIsLoading(true);
+    // Basic validation
+    if (!email.trim() || !password.trim()) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    dispatch(setLoading(true));
+    dispatch(clearError());
     
-    // Phase 0: Mock authentication - accept any email/password
-    console.log('Login attempt:', { email, password });
-    
-    // Simulate API call delay
-    setTimeout(() => {
-      // Create mock user and set authenticated state
-      const mockUser = {
-        uid: '1',
-        email: email,
-        username: email.split('@')[0],
-        createdAt: new Date(),
-        lastLogin: new Date(),
-      };
+    try {
+      console.log('Attempting Firebase login:', { email });
+      const user = await signInWithEmail({ email: email.trim(), password });
       
-      dispatch(setUser(mockUser));
-      setIsLoading(false);
-    }, 1000);
+      console.log('Login successful:', user);
+      dispatch(setUser(user));
+    } catch (error: any) {
+      console.error('Login error:', error);
+      const errorMessage = error.message || 'Failed to sign in';
+      dispatch(setError(errorMessage));
+      Alert.alert('Login Failed', errorMessage);
+    } finally {
+      dispatch(setLoading(false));
+    }
   };
 
   const handleForgotPassword = () => {

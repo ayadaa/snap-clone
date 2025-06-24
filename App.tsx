@@ -1,3 +1,4 @@
+import './src/config/firebase'; // Ensure Firebase is initialized first
 import React from 'react';
 import { Provider } from 'react-redux';
 import { StatusBar } from 'expo-status-bar';

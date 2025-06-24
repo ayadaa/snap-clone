@@ -1,47 +1,71 @@
 import React, { useState } from 'react';
-import { View, Text, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Screen } from '../../components/common/Screen';
 import { Input } from '../../components/common/Input';
 import { Button } from '../../components/common/Button';
-import { useAppDispatch } from '../../store/hooks';
-import { setUser } from '../../store/slices/auth.slice';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { setUser, setError, setLoading, clearError } from '../../store/slices/auth.slice';
+import { signUpWithEmail } from '../../services/firebase/auth';
 
 /**
  * Signup screen component for user registration.
- * Phase 0 implementation with basic form fields and no validation.
- * Will be enhanced with Firebase authentication and validation in later development.
+ * Integrates with Firebase Authentication for real user registration.
+ * Includes form validation and proper error handling.
  */
 export function SignupScreen() {
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   
   const navigation = useNavigation<any>();
   const dispatch = useAppDispatch();
+  const isLoading = useAppSelector((state) => state.auth.isLoading);
 
   const handleSignup = async () => {
-    setIsLoading(true);
+    // Form validation
+    if (!email.trim() || !username.trim() || !password.trim() || !confirmPassword.trim()) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match');
+      return;
+    }
+
+    if (password.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters long');
+      return;
+    }
+
+    if (username.length < 3) {
+      Alert.alert('Error', 'Username must be at least 3 characters long');
+      return;
+    }
+
+    dispatch(setLoading(true));
+    dispatch(clearError());
     
-    // Phase 0: Mock authentication - accept any valid signup
-    console.log('Signup attempt:', { email, username, password, confirmPassword });
-    
-    // Simulate API call delay
-    setTimeout(() => {
-      // Create mock user and set authenticated state
-      const mockUser = {
-        uid: Date.now().toString(),
-        email: email,
-        username: username,
-        createdAt: new Date(),
-        lastLogin: new Date(),
-      };
+    try {
+      console.log('Attempting Firebase signup:', { email, username });
+      const user = await signUpWithEmail({ 
+        email: email.trim(), 
+        password, 
+        username: username.trim() 
+      });
       
-      dispatch(setUser(mockUser));
-      setIsLoading(false);
-    }, 1000);
+      console.log('Signup successful:', user);
+      dispatch(setUser(user));
+    } catch (error: any) {
+      console.error('Signup error:', error);
+      const errorMessage = error.message || 'Failed to create account';
+      dispatch(setError(errorMessage));
+      Alert.alert('Signup Failed', errorMessage);
+    } finally {
+      dispatch(setLoading(false));
+    }
   };
 
   const navigateToLogin = () => {

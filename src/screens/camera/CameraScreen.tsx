@@ -1,6 +1,9 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Screen } from '../../components/common/Screen';
+import { useAppDispatch } from '../../store/hooks';
+import { clearUser } from '../../store/slices/auth.slice';
+import { signOutUser } from '../../services/firebase/auth';
 
 /**
  * Camera screen component - the heart of SnapClone.
@@ -8,9 +11,21 @@ import { Screen } from '../../components/common/Screen';
  * Will be enhanced with Expo Camera integration in Phase 1.
  */
 export function CameraScreen() {
+  const dispatch = useAppDispatch();
+
   const handleProfilePress = () => {
     console.log('Profile pressed');
     // TODO: Navigate to profile screen
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOutUser();
+      dispatch(clearUser());
+      console.log('Logged out successfully');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   const handleSearchPress = () => {
@@ -63,15 +78,31 @@ export function CameraScreen() {
             </Text>
           </TouchableOpacity>
 
-          <Text
-            style={{
-              color: '#FFFFFF',
-              fontSize: 18,
-              fontWeight: 'bold',
-            }}
-          >
-            SnapClone
-          </Text>
+          <View style={{ alignItems: 'center' }}>
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 18,
+                fontWeight: 'bold',
+              }}
+            >
+              SnapClone
+            </Text>
+            <TouchableOpacity
+              onPress={handleLogout}
+              style={{
+                marginTop: 4,
+                paddingHorizontal: 8,
+                paddingVertical: 2,
+                backgroundColor: 'rgba(255, 0, 0, 0.3)',
+                borderRadius: 8,
+              }}
+            >
+              <Text style={{ color: '#FFFFFF', fontSize: 10 }}>
+                Logout
+              </Text>
+            </TouchableOpacity>
+          </View>
 
           <TouchableOpacity
             onPress={handleSearchPress}
