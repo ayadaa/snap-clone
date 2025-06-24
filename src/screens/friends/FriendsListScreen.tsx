@@ -13,6 +13,8 @@ import { useNavigation } from '@react-navigation/native';
 import { Screen } from '../../components/common/Screen';
 import { UserCard } from '../../components/friends/UserCard';
 import { useFriends } from '../../hooks/friends/use-friends';
+import { useChats } from '../../hooks/chat/use-chats';
+import { useAuth } from '../../hooks/auth/use-auth';
 
 /**
  * Friends List screen displaying all accepted friends with their online status.
@@ -22,6 +24,7 @@ import { useFriends } from '../../hooks/friends/use-friends';
 
 export function FriendsListScreen() {
   const navigation = useNavigation();
+  const { user } = useAuth();
   
   const {
     friends,
@@ -30,13 +33,26 @@ export function FriendsListScreen() {
     refreshFriends,
   } = useFriends();
 
+  const { createChat } = useChats(user?.uid || '');
+
   /**
    * Handle friend card press - navigate to chat
    */
-  const handleFriendPress = (friendId: string, username: string) => {
-    // TODO: Navigate to individual chat screen
-    console.log('Navigate to chat with:', username);
-    Alert.alert('Chat', `Opening chat with ${username}`);
+  const handleFriendPress = async (friendId: string, username: string) => {
+    try {
+      const chatId = await createChat(friendId);
+      const friend = friends.find(f => f.uid === friendId);
+      
+      if (friend) {
+        (navigation as any).navigate('IndividualChat', {
+          chatId,
+          otherUser: friend,
+        });
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to start chat. Please try again.');
+      console.error('Error creating chat:', error);
+    }
   };
 
   /**

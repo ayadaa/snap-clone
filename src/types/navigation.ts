@@ -38,6 +38,17 @@ export type AppStackParamList = {
   SnapViewer: {
     snapId: string;
   };
+  IndividualChat: {
+    chatId: string;
+    otherUser: {
+      uid: string;
+      email: string;
+      username: string;
+      displayName?: string;
+      profilePicture?: string;
+      isOnline: boolean;
+    };
+  };
 };
 
 export type RootStackParamList = {

@@ -7,6 +7,7 @@ import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { MainTabNavigator } from './MainTabNavigator';
 import { SnapViewerScreen } from '../screens/camera/SnapViewerScreen';
+import { IndividualChatScreen } from '../screens/chat/IndividualChatScreen';
 import { AppStackParamList } from '../types/navigation';
 
 const Stack = createStackNavigator<AppStackParamList>();
@@ -42,6 +43,14 @@ export function AppStackNavigator() {
               },
             };
           },
+        }}
+      />
+      <Stack.Screen
+        name="IndividualChat"
+        component={IndividualChatScreen}
+        options={{
+          presentation: 'card',
+          gestureEnabled: true,
         }}
       />
     </Stack.Navigator>

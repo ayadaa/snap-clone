@@ -12,7 +12,8 @@ import {
   limit, 
   serverTimestamp,
   onSnapshot,
-  Timestamp 
+  Timestamp,
+  writeBatch
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 
@@ -263,5 +264,138 @@ export async function createOrGetChat(userId1: string, userId2: string): Promise
   } catch (error) {
     console.error('Create or get chat error:', error);
     throw new Error('Failed to create or get chat');
+  }
+}
+
+/**
+ * Send a text message to a chat
+ */
+export async function sendMessage(
+  chatId: string, 
+  senderId: string, 
+  text: string
+): Promise<string> {
+  try {
+    const messageRef = doc(collection(db, 'chats', chatId, 'messages'));
+    const messageData = {
+      senderId,
+      text,
+      timestamp: serverTimestamp(),
+      status: 'sent' as const,
+      type: 'text' as const,
+    };
+    
+    await setDoc(messageRef, messageData);
+    
+    // Update chat's last message
+    await updateDoc(doc(db, 'chats', chatId), {
+      lastMessage: {
+        text,
+        senderId,
+        timestamp: serverTimestamp(),
+        type: 'text',
+      },
+      updatedAt: serverTimestamp(),
+    });
+    
+    return messageRef.id;
+  } catch (error) {
+    console.error('Send message error:', error);
+    throw new Error('Failed to send message');
+  }
+}
+
+/**
+ * Get messages for a chat with real-time listener
+ */
+export function subscribeToMessages(
+  chatId: string,
+  callback: (messages: Message[]) => void
+): () => void {
+  try {
+    const messagesQuery = query(
+      collection(db, 'chats', chatId, 'messages'),
+      orderBy('timestamp', 'asc')
+    );
+    
+    return onSnapshot(messagesQuery, (snapshot) => {
+      const messages = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Message[];
+      
+      callback(messages);
+    });
+  } catch (error) {
+    console.error('Subscribe to messages error:', error);
+    throw new Error('Failed to subscribe to messages');
+  }
+}
+
+/**
+ * Get user's chats with real-time listener
+ */
+export function subscribeToUserChats(
+  userId: string,
+  callback: (chats: Chat[]) => void
+): () => void {
+  try {
+    const chatsQuery = query(
+      collection(db, 'chats'),
+      where('participants', 'array-contains', userId),
+      orderBy('updatedAt', 'desc')
+    );
+    
+    return onSnapshot(chatsQuery, (snapshot) => {
+      const chats = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Chat[];
+      
+      callback(chats);
+    });
+  } catch (error) {
+    console.error('Subscribe to user chats error:', error);
+    throw new Error('Failed to subscribe to user chats');
+  }
+}
+
+/**
+ * Mark messages as read
+ */
+export async function markMessagesAsRead(
+  chatId: string, 
+  messageIds: string[]
+): Promise<void> {
+  try {
+    const batch = writeBatch(db);
+    
+    messageIds.forEach(messageId => {
+      const messageRef = doc(db, 'chats', chatId, 'messages', messageId);
+      batch.update(messageRef, { status: 'read' });
+    });
+    
+    await batch.commit();
+  } catch (error) {
+    console.error('Mark messages as read error:', error);
+    throw new Error('Failed to mark messages as read');
+  }
+}
+
+/**
+ * Get chat by ID
+ */
+export async function getChat(chatId: string): Promise<Chat | null> {
+  try {
+    const chatDoc = await getDoc(doc(db, 'chats', chatId));
+    
+    if (chatDoc.exists()) {
+      return { id: chatDoc.id, ...chatDoc.data() } as Chat;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Get chat error:', error);
+    throw new Error('Failed to get chat');
   }
 } 
