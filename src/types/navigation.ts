@@ -47,6 +47,9 @@ export type AppStackParamList = {
   GroupChat: {
     groupId: string;
   };
+  GroupSettings: {
+    groupId: string;
+  };
   CreateGroup: undefined;
   StoryViewer: {
     storyId: string;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Screen } from '../../components/common/Screen';
 import { LoginForm } from '../../components/forms/LoginForm';
@@ -27,43 +27,38 @@ export function LoginScreen() {
   };
 
   return (
-    <Screen backgroundColor="#000000">
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <View style={{ flex: 1, padding: 24, justifyContent: 'center' }}>
-          {/* Header */}
-          <View style={{ alignItems: 'center', marginBottom: 48 }}>
-            <Text
-              style={{
-                fontSize: 32,
-                fontWeight: 'bold',
-                color: '#FFFFFF',
-                marginBottom: 8,
-              }}
-            >
-              SnapClone
-            </Text>
-            <Text
-              style={{
-                fontSize: 16,
-                color: 'rgba(255, 255, 255, 0.6)',
-                textAlign: 'center',
-              }}
-            >
-              Sign in to continue
-            </Text>
-          </View>
-
-          {/* Login Form */}
-          <LoginForm
-            onSuccess={handleLoginSuccess}
-            onForgotPassword={handleForgotPassword}
-            onNavigateToSignup={navigateToSignup}
-          />
+    <Screen backgroundColor="#000000" keyboardAvoidingView>
+      <View style={{ flex: 1, padding: 24, justifyContent: 'center' }}>
+        {/* Header */}
+        <View style={{ alignItems: 'center', marginBottom: 48 }}>
+          <Text
+            style={{
+              fontSize: 32,
+              fontWeight: 'bold',
+              color: '#FFFFFF',
+              marginBottom: 8,
+            }}
+          >
+            SnapClone
+          </Text>
+          <Text
+            style={{
+              fontSize: 16,
+              color: 'rgba(255, 255, 255, 0.6)',
+              textAlign: 'center',
+            }}
+          >
+            Sign in to continue
+          </Text>
         </View>
-      </KeyboardAvoidingView>
+
+        {/* Login Form */}
+        <LoginForm
+          onSuccess={handleLoginSuccess}
+          onForgotPassword={handleForgotPassword}
+          onNavigateToSignup={navigateToSignup}
+        />
+      </View>
     </Screen>
   );
 } 

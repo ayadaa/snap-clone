@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Screen } from '../../components/common/Screen';
 import { SignupForm } from '../../components/forms/SignupForm';
@@ -22,47 +22,42 @@ export function SignupScreen() {
   };
 
   return (
-    <Screen backgroundColor="#000000">
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    <Screen backgroundColor="#000000" keyboardAvoidingView>
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1 }}
+        showsVerticalScrollIndicator={false}
       >
-        <ScrollView
-          contentContainerStyle={{ flexGrow: 1 }}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={{ flex: 1, padding: 24, justifyContent: 'center' }}>
-            {/* Header */}
-            <View style={{ alignItems: 'center', marginBottom: 48 }}>
-              <Text
-                style={{
-                  fontSize: 32,
-                  fontWeight: 'bold',
-                  color: '#FFFFFF',
-                  marginBottom: 8,
-                }}
-              >
-                Join SnapClone
-              </Text>
-              <Text
-                style={{
-                  fontSize: 16,
-                  color: 'rgba(255, 255, 255, 0.6)',
-                  textAlign: 'center',
-                }}
-              >
-                Create your account to get started
-              </Text>
-            </View>
-
-            {/* Signup Form */}
-            <SignupForm
-              onSuccess={handleSignupSuccess}
-              onNavigateToLogin={navigateToLogin}
-            />
+        <View style={{ flex: 1, padding: 24, justifyContent: 'center' }}>
+          {/* Header */}
+          <View style={{ alignItems: 'center', marginBottom: 48 }}>
+            <Text
+              style={{
+                fontSize: 32,
+                fontWeight: 'bold',
+                color: '#FFFFFF',
+                marginBottom: 8,
+              }}
+            >
+              Join SnapClone
+            </Text>
+            <Text
+              style={{
+                fontSize: 16,
+                color: 'rgba(255, 255, 255, 0.6)',
+                textAlign: 'center',
+              }}
+            >
+              Create your account to get started
+            </Text>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+
+          {/* Signup Form */}
+          <SignupForm
+            onSuccess={handleSignupSuccess}
+            onNavigateToLogin={navigateToLogin}
+          />
+        </View>
+      </ScrollView>
     </Screen>
   );
 } 

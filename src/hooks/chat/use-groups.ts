@@ -3,11 +3,14 @@ import {
   createGroup,
   getUserGroups,
   subscribeToUserGroups,
-  addMembersToGroup,
-  removeMemberFromGroup,
-  updateGroupSettings,
+  addMembersToGroup as addMembersToGroupService,
+  removeMemberFromGroup as removeMemberFromGroupService,
+  updateGroupSettings as updateGroupSettingsService,
   type Group,
 } from '../../services/firebase/firestore.service';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../../config/firebase';
+import { sendGroupMessage } from '../../services/firebase/firestore.service';
 
 /**
  * Custom hook for managing group functionality.
@@ -61,13 +64,13 @@ export function useGroups(currentUserId: string) {
   /**
    * Add members to a group
    */
-  const addMembers = useCallback(async (
+  const addMembersToGroup = useCallback(async (
     groupId: string,
     memberIds: string[]
   ): Promise<void> => {
     try {
       setError(null);
-      await addMembersToGroup(groupId, memberIds, currentUserId);
+      await addMembersToGroupService(groupId, memberIds, currentUserId);
       await loadGroups(); // Refresh groups list
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to add members';
@@ -79,13 +82,13 @@ export function useGroups(currentUserId: string) {
   /**
    * Remove a member from a group
    */
-  const removeMember = useCallback(async (
+  const removeMemberFromGroup = useCallback(async (
     groupId: string,
     memberId: string
   ): Promise<void> => {
     try {
       setError(null);
-      await removeMemberFromGroup(groupId, memberId, currentUserId);
+      await removeMemberFromGroupService(groupId, memberId, currentUserId);
       await loadGroups(); // Refresh groups list
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to remove member';
@@ -103,7 +106,7 @@ export function useGroups(currentUserId: string) {
   ): Promise<void> => {
     try {
       setError(null);
-      await updateGroupSettings(groupId, settings);
+      await updateGroupSettingsService(groupId, settings);
       await loadGroups(); // Refresh groups list
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update settings';
@@ -127,6 +130,65 @@ export function useGroups(currentUserId: string) {
     return group.admins.includes(currentUserId);
   }, [currentUserId]);
 
+  /**
+   * Update group name
+   */
+  const updateGroupName = useCallback(async (groupId: string, newName: string): Promise<void> => {
+    try {
+      setError(null);
+      await updateDoc(doc(db, 'groups', groupId), {
+        name: newName,
+      });
+      
+      // Send system message about name change
+      await sendGroupMessage(groupId, {
+        senderId: currentUserId,
+        type: 'system',
+        systemMessageType: 'name_changed',
+        metadata: {
+          newName,
+        },
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update group name';
+      setError(errorMessage);
+      throw err;
+    }
+  }, [currentUserId]);
+
+  /**
+   * Update group settings
+   */
+  const updateGroupSettings = useCallback(async (
+    groupId: string, 
+    settings: Partial<Group['settings']>
+  ): Promise<void> => {
+    try {
+      setError(null);
+      await updateDoc(doc(db, 'groups', groupId), {
+        settings,
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update group settings';
+      setError(errorMessage);
+      throw err;
+    }
+  }, []);
+
+  /**
+   * Leave group
+   */
+  const leaveGroup = useCallback(async (groupId: string, userId: string): Promise<void> => {
+    try {
+      setError(null);
+      await removeMemberFromGroupService(groupId, userId, userId);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to leave group';
+      setError(errorMessage);
+      throw err;
+    }
+  }, []);
+
   // Set up real-time listener for groups
   useEffect(() => {
     if (!currentUserId) return;
@@ -149,11 +211,11 @@ export function useGroups(currentUserId: string) {
     loading,
     error,
     createNewGroup,
-    addMembers,
-    removeMember,
-    updateSettings,
-    isAdmin,
-    canMessage,
+    addMembersToGroup,
+    removeMemberFromGroup,
+    updateGroupName,
+    updateGroupSettings,
+    leaveGroup,
     refreshGroups: loadGroups,
   };
 } 

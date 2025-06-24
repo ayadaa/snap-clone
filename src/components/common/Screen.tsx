@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StatusBar, ViewStyle } from 'react-native';
+import { View, StatusBar, ViewStyle, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface ScreenProps {
@@ -8,6 +8,7 @@ interface ScreenProps {
   backgroundColor?: string;
   statusBarStyle?: 'default' | 'light-content' | 'dark-content';
   edges?: ('top' | 'bottom' | 'left' | 'right')[];
+  keyboardAvoidingView?: boolean;
 }
 
 /**
@@ -19,6 +20,7 @@ interface ScreenProps {
  * @param backgroundColor - Background color override
  * @param statusBarStyle - Status bar content style
  * @param edges - Which edges to apply safe area insets to
+ * @param keyboardAvoidingView - Whether to wrap content in KeyboardAvoidingView
  */
 export function Screen({
   children,
@@ -26,7 +28,20 @@ export function Screen({
   backgroundColor = '#000000',
   statusBarStyle = 'light-content',
   edges = ['top', 'bottom'],
+  keyboardAvoidingView = false,
 }: ScreenProps) {
+  const content = keyboardAvoidingView ? (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
+      {children}
+    </KeyboardAvoidingView>
+  ) : (
+    children
+  );
+
   return (
     <SafeAreaView
       style={[
@@ -44,7 +59,7 @@ export function Screen({
         translucent
       />
       <View style={{ flex: 1, backgroundColor }}>
-        {children}
+        {content}
       </View>
     </SafeAreaView>
   );

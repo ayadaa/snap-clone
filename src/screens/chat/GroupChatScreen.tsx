@@ -23,13 +23,13 @@ import { useGroupMessages } from '../../hooks/chat/use-group-messages';
 import { useGroups } from '../../hooks/chat/use-groups';
 import { getUserProfile } from '../../services/firebase/firestore.service';
 import type { RootState } from '../../store';
-import type { AppStackParamList } from '../../types/navigation';
+import type { AppStackParamList, NavigationProp } from '../../types/navigation';
 import type { GroupMessage, UserProfile } from '../../services/firebase/firestore.service';
 
 type GroupChatRouteProp = RouteProp<AppStackParamList, 'GroupChat'>;
 
 export default function GroupChatScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp>();
   const route = useRoute<GroupChatRouteProp>();
   const { groupId } = route.params;
   
@@ -154,9 +154,8 @@ export default function GroupChatScreen() {
    * Navigate to group settings
    */
   const handleGroupSettings = useCallback(() => {
-    // TODO: Navigate to group settings screen
-    Alert.alert('Group Settings', 'Group settings coming soon!');
-  }, []);
+    navigation.navigate('GroupSettings', { groupId });
+  }, [navigation, groupId]);
 
   // Load participants when group changes
   useEffect(() => {
@@ -210,9 +209,9 @@ export default function GroupChatScreen() {
         
         <TouchableOpacity
           style={styles.settingsButton}
-          onPress={handleGroupSettings}
+          onPress={() => navigation.navigate('GroupSettings', { groupId })}
         >
-          <Ionicons name="settings-outline" size={24} color="#FFFFFF" />
+          <Ionicons name="settings" size={24} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
 

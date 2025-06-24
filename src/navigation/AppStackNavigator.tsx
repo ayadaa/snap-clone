@@ -11,6 +11,7 @@ import { IndividualChatScreen } from '../screens/chat/IndividualChatScreen';
 import StoryViewerScreen from '../screens/stories/StoryViewerScreen';
 import CreateGroupScreen from '../screens/chat/CreateGroupScreen';
 import GroupChatScreen from '../screens/chat/GroupChatScreen';
+import GroupSettingsScreen from '../screens/chat/GroupSettingsScreen';
 import { AppStackParamList } from '../types/navigation';
 import { CardStyleInterpolators } from '@react-navigation/stack';
 
@@ -49,24 +50,26 @@ export default function AppStackNavigator() {
       />
 
       <Stack.Screen 
-        name="CreateGroup" 
-        component={CreateGroupScreen}
-        options={{
-          headerShown: true,
-          headerStyle: { backgroundColor: '#000000' },
-          headerTintColor: '#FFFFFF',
-          headerTitle: 'Create Group',
-        }}
-      />
-
-      <Stack.Screen 
         name="GroupChat" 
         component={GroupChatScreen}
         options={{
-          headerShown: true,
-          headerStyle: { backgroundColor: '#000000' },
-          headerTintColor: '#FFFFFF',
-          headerTitle: '',
+          headerShown: false,
+        }}
+      />
+      
+      <Stack.Screen 
+        name="GroupSettings" 
+        component={GroupSettingsScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      
+      <Stack.Screen 
+        name="CreateGroup" 
+        component={CreateGroupScreen}
+        options={{
+          headerShown: false,
         }}
       />
       
