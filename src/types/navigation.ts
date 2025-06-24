@@ -30,6 +30,7 @@ export type MainTabParamList = {
   Camera: undefined;
   Friends: undefined;
   Stories: undefined;
+  Profile: undefined;
 };
 
 export type AppStackParamList = {

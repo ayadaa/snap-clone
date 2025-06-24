@@ -5,13 +5,14 @@ import { ChatScreen } from '../screens/chat/ChatScreen';
 import { CameraStackNavigator } from './CameraStackNavigator';
 import { FriendsStackNavigator } from './FriendsStackNavigator';
 import { StoriesScreen } from '../screens/stories/StoriesScreen';
+import { ProfileScreen } from '../screens/profile/ProfileScreen';
 import { MainTabParamList } from '../types/navigation';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 /**
  * Main tab navigator for authenticated users.
- * Provides bottom tab navigation between Chat, Camera (center), Friends, and Stories.
+ * Provides bottom tab navigation between Chat, Camera (center), Friends, Stories, and Profile.
  * Follows SnapChat's core navigation pattern with Camera as the default screen.
  */
 export function MainTabNavigator() {
@@ -96,6 +97,22 @@ export function MainTabNavigator() {
             </Text>
           ),
           tabBarLabel: 'Stories',
+        }}
+      />
+      
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <Text style={{ 
+              fontSize: 20, 
+              color: focused ? '#0084FF' : 'rgba(255, 255, 255, 0.6)' 
+            }}>
+              👤
+            </Text>
+          ),
+          tabBarLabel: 'Profile',
         }}
       />
     </Tab.Navigator>
