@@ -5,6 +5,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSelector } from 'react-redux';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../config/firebase';
 import { RootState } from '../../store';
 import { uploadSnap, UploadProgress } from '../../services/firebase/storage.service';
 import {
@@ -26,9 +28,14 @@ export interface SendSnapData {
   hasDrawing?: boolean;
 }
 
+// Extended snap interface with username
+export interface SnapWithUsername extends Snap {
+  senderUsername?: string;
+}
+
 export interface UseSnapsReturn {
   // State
-  receivedSnaps: Snap[];
+  receivedSnaps: SnapWithUsername[];
   sentSnaps: Snap[];
   isLoading: boolean;
   error: string | null;
@@ -37,6 +44,7 @@ export interface UseSnapsReturn {
   // Actions
   sendSnap: (snapData: SendSnapData) => Promise<void>;
   viewSnap: (snapId: string) => Promise<Snap | null>;
+  markSnapAsViewed: (snapId: string) => Promise<void>;
   refreshSnaps: () => Promise<void>;
   clearError: () => void;
   
@@ -49,7 +57,7 @@ export interface UseSnapsReturn {
  * Hook for managing snap operations
  */
 export function useSnaps(): UseSnapsReturn {
-  const [receivedSnaps, setReceivedSnaps] = useState<Snap[]>([]);
+  const [receivedSnaps, setReceivedSnaps] = useState<SnapWithUsername[]>([]);
   const [sentSnaps, setSentSnaps] = useState<Snap[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,19 +66,48 @@ export function useSnaps(): UseSnapsReturn {
   const currentUser = useSelector((state: RootState) => state.auth.user);
 
   /**
-   * Load received snaps for current user
+   * Fetch username for a user ID
+   */
+  const fetchUsername = useCallback(async (userId: string): Promise<string> => {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      if (userDoc.exists()) {
+        return userDoc.data().username || 'Unknown User';
+      }
+      return 'Unknown User';
+    } catch (error) {
+      console.error('Error fetching username for', userId, ':', error);
+      return 'Unknown User';
+    }
+  }, []);
+
+  /**
+   * Load received snaps for current user with sender usernames
    */
   const loadReceivedSnaps = useCallback(async () => {
     if (!currentUser?.uid) return;
 
     try {
       const snaps = await getReceivedSnaps(currentUser.uid);
-      setReceivedSnaps(snaps);
+      
+      // Fetch usernames for all senders
+      const snapsWithUsernames = await Promise.all(
+        snaps.map(async (snap) => {
+          const senderUsername = await fetchUsername(snap.senderId);
+          return {
+            ...snap,
+            senderUsername
+          };
+        })
+      );
+      
+      setReceivedSnaps(snapsWithUsernames);
+      console.log('Loaded received snaps with usernames:', snapsWithUsernames);
     } catch (err) {
       console.error('Error loading received snaps:', err);
       setError('Failed to load received snaps');
     }
-  }, [currentUser?.uid]);
+  }, [currentUser?.uid, fetchUsername]);
 
   /**
    * Load sent snaps for current user
@@ -194,6 +231,31 @@ export function useSnaps(): UseSnapsReturn {
   }, [currentUser?.uid]);
 
   /**
+   * Mark a snap as viewed (simplified version for viewer screen)
+   */
+  const markSnapAsViewedSimple = useCallback(async (snapId: string) => {
+    if (!currentUser?.uid) {
+      throw new Error('User not authenticated');
+    }
+
+    try {
+      await markSnapAsViewed(snapId, currentUser.uid);
+      // Update local state to reflect the viewed status
+      setReceivedSnaps(prev => 
+        prev.map(snap => 
+          snap.id === snapId 
+            ? { ...snap, viewed: true, status: 'opened' }
+            : snap
+        )
+      );
+    } catch (err) {
+      console.error('Error marking snap as viewed:', err);
+      setError(err instanceof Error ? err.message : 'Failed to mark snap as viewed');
+      throw err;
+    }
+  }, [currentUser?.uid]);
+
+  /**
    * Clear error state
    */
   const clearError = useCallback(() => {
@@ -258,6 +320,7 @@ export function useSnaps(): UseSnapsReturn {
     // Actions
     sendSnap,
     viewSnap,
+    markSnapAsViewed: markSnapAsViewedSimple,
     refreshSnaps,
     clearError,
     

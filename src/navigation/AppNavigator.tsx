@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { AuthNavigator } from './AuthNavigator';
-import { MainTabNavigator } from './MainTabNavigator';
+import { AppStackNavigator } from './AppStackNavigator';
 import { useAppSelector } from '../store/hooks';
 
 /**
@@ -19,7 +19,7 @@ export function AppNavigator() {
 
   return (
     <NavigationContainer>
-      {isAuthenticated ? <MainTabNavigator /> : <AuthNavigator />}
+      {isAuthenticated ? <AppStackNavigator /> : <AuthNavigator />}
     </NavigationContainer>
   );
 } 

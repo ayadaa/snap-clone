@@ -32,6 +32,13 @@ export type MainTabParamList = {
   Stories: undefined;
 };
 
+export type AppStackParamList = {
+  MainTabs: undefined;
+  SnapViewer: {
+    snapId: string;
+  };
+};
+
 export type RootStackParamList = {
   Auth: undefined;
   Main: undefined;
