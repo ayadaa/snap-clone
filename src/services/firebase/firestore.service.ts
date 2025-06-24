@@ -15,7 +15,8 @@ import {
   Timestamp,
   writeBatch,
   arrayUnion,
-  arrayRemove
+  arrayRemove,
+  increment
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 
@@ -92,6 +93,21 @@ export interface StoryView {
   viewerId: string;
   viewedAt: Timestamp;
   snapIndex: number; // which snap in the story was viewed
+}
+
+/**
+ * Snap data interface for storing snap metadata
+ */
+export interface SnapData {
+  id: string;
+  senderId: string;
+  storageUrl: string;
+  mediaType: 'photo' | 'video';
+  duration?: number;
+  createdAt: Timestamp;
+  expiresAt?: Timestamp; // For ephemeral snaps
+  viewCount: number;
+  viewers: string[]; // userIds who have viewed this snap
 }
 
 export interface Group {
@@ -373,6 +389,44 @@ export async function sendMessage(
   } catch (error) {
     console.error('Send message error:', error);
     throw new Error('Failed to send message');
+  }
+}
+
+/**
+ * Send a snap message to a chat
+ */
+export async function sendSnapMessage(
+  chatId: string,
+  senderId: string,
+  snapId: string
+): Promise<string> {
+  try {
+    const messageRef = doc(collection(db, 'chats', chatId, 'messages'));
+    const messageData = {
+      senderId,
+      snapId,
+      timestamp: serverTimestamp(),
+      status: 'sent' as const,
+      type: 'snap' as const,
+    };
+    
+    await setDoc(messageRef, messageData);
+    
+    // Update chat's last message
+    await updateDoc(doc(db, 'chats', chatId), {
+      lastMessage: {
+        text: '📸 Snap', // Display text for snap messages
+        senderId,
+        timestamp: serverTimestamp(),
+        type: 'snap',
+      },
+      updatedAt: serverTimestamp(),
+    });
+    
+    return messageRef.id;
+  } catch (error) {
+    console.error('Send snap message error:', error);
+    throw new Error('Failed to send snap message');
   }
 }
 
@@ -1048,7 +1102,7 @@ export async function markGroupMessagesAsRead(
   try {
     const batch = writeBatch(db);
     
-    messageIds.forEach(messageId => {
+    for (const messageId of messageIds) {
       const messageRef = doc(db, 'groups', groupId, 'messages', messageId);
       batch.update(messageRef, {
         readBy: arrayUnion({
@@ -1056,11 +1110,83 @@ export async function markGroupMessagesAsRead(
           readAt: Timestamp.now(),
         }),
       });
-    });
+    }
     
     await batch.commit();
   } catch (error) {
     console.error('Mark group messages as read error:', error);
-    throw new Error('Failed to mark group messages as read');
+    throw new Error('Failed to mark messages as read');
+  }
+}
+
+/**
+ * Store snap data for sharing across chats, groups, and stories
+ */
+export async function storeSnapData(snapData: {
+  senderId: string;
+  storageUrl: string;
+  mediaType: 'photo' | 'video';
+  duration?: number;
+  expiresAt?: Date;
+}): Promise<string> {
+  try {
+    const snapRef = doc(collection(db, 'snaps'));
+    
+    // Build snap document with only defined fields
+    const snapDocument: any = {
+      id: snapRef.id,
+      senderId: snapData.senderId,
+      storageUrl: snapData.storageUrl,
+      mediaType: snapData.mediaType,
+      createdAt: Timestamp.now(),
+      viewCount: 0,
+      viewers: [],
+    };
+    
+    // Only include optional fields if they have values
+    if (snapData.duration !== undefined) {
+      snapDocument.duration = snapData.duration;
+    }
+    if (snapData.expiresAt) {
+      snapDocument.expiresAt = Timestamp.fromDate(snapData.expiresAt);
+    }
+    
+    await setDoc(snapRef, snapDocument);
+    return snapRef.id;
+  } catch (error) {
+    console.error('Store snap data error:', error);
+    throw new Error('Failed to store snap data');
+  }
+}
+
+/**
+ * Get snap data by ID
+ */
+export async function getSnapData(snapId: string): Promise<SnapData | null> {
+  try {
+    const snapDoc = await getDoc(doc(db, 'snaps', snapId));
+    if (snapDoc.exists()) {
+      return { id: snapDoc.id, ...snapDoc.data() } as SnapData;
+    }
+    return null;
+  } catch (error) {
+    console.error('Get snap data error:', error);
+    throw new Error('Failed to get snap data');
+  }
+}
+
+/**
+ * Mark snap as viewed by user
+ */
+export async function markSnapAsViewed(snapId: string, viewerId: string): Promise<void> {
+  try {
+    const snapRef = doc(db, 'snaps', snapId);
+    await updateDoc(snapRef, {
+      viewers: arrayUnion(viewerId),
+      viewCount: increment(1),
+    });
+  } catch (error) {
+    console.error('Mark snap as viewed error:', error);
+    throw new Error('Failed to mark snap as viewed');
   }
 } 

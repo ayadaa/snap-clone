@@ -43,11 +43,20 @@ export function useChats(currentUserId: string) {
             if (otherUserId) {
               const otherUser = await getUserProfile(otherUserId);
               if (otherUser) {
+                // Ensure username exists, provide fallback if missing
+                const enrichedUser = {
+                  ...otherUser,
+                  username: otherUser.username || `User_${otherUserId.slice(-6)}`,
+                  displayName: otherUser.displayName || otherUser.username || `User_${otherUserId.slice(-6)}`,
+                };
+                
                 enrichedChats.push({
                   ...chat,
-                  otherUser,
+                  otherUser: enrichedUser,
                   unreadCount: 0, // This would be calculated from messages
                 });
+              } else {
+                console.warn(`Could not load profile for user: ${otherUserId}`);
               }
             }
           }

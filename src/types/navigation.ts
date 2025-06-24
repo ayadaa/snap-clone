@@ -39,6 +39,8 @@ export type AppStackParamList = {
   MainTabs: undefined;
   SnapViewer: {
     snapId: string;
+    chatType?: 'individual' | 'group';
+    senderId?: string;
   };
   IndividualChat: {
     chatId: string;

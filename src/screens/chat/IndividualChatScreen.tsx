@@ -72,6 +72,7 @@ export function IndividualChatScreen() {
     <MessageBubble
       message={item}
       isCurrentUser={item.senderId === currentUserId}
+      chatType="individual"
     />
   );
 
@@ -114,7 +115,7 @@ export function IndividualChatScreen() {
         }}
       >
         <Text style={{ color: '#FFFFFF', fontSize: 16 }}>
-          {otherUser.username.charAt(0).toUpperCase()}
+          {otherUser?.username?.charAt(0).toUpperCase() || '?'}
         </Text>
       </View>
 
@@ -126,7 +127,7 @@ export function IndividualChatScreen() {
             fontWeight: 'bold',
           }}
         >
-          {otherUser.username}
+          {otherUser?.username || 'Unknown User'}
         </Text>
         <Text
           style={{
@@ -134,7 +135,7 @@ export function IndividualChatScreen() {
             fontSize: 14,
           }}
         >
-          {otherUser.isOnline ? 'Online' : 'Offline'}
+          {otherUser?.isOnline ? 'Online' : 'Offline'}
         </Text>
       </View>
     </View>
@@ -167,7 +168,7 @@ export function IndividualChatScreen() {
           marginBottom: 4,
         }}
       >
-        Start a conversation with {otherUser.username}
+        Start a conversation with {otherUser?.username || 'this user'}
       </Text>
       <Text
         style={{
@@ -258,7 +259,7 @@ export function IndividualChatScreen() {
       <ChatInput
         onSendMessage={handleSendMessage}
         sending={sending}
-        placeholder={`Message ${otherUser.username}...`}
+        placeholder={`Message ${otherUser?.username || 'user'}...`}
       />
     </Screen>
   );

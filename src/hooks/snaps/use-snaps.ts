@@ -8,16 +8,22 @@ import { useSelector } from 'react-redux';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { RootState } from '../../store';
-import { uploadSnap, UploadProgress } from '../../services/firebase/storage.service';
+import { uploadSnap, type UploadProgress } from '../../services/firebase/storage.service';
 import {
   createSnap,
   getReceivedSnaps,
   getSentSnaps,
   markSnapAsViewed,
   deleteSnapImmediately,
-  Snap,
-  CreateSnapData
+  type Snap,
+  type CreateSnapData
 } from '../../services/firebase/snaps.service';
+import { 
+  createOrGetChat, 
+  sendSnapMessage, 
+  storeSnapData,
+  getUserProfile
+} from '../../services/firebase/firestore.service';
 
 export interface SendSnapData {
   recipientIds: string[];
@@ -92,12 +98,20 @@ export function useSnaps(): UseSnapsReturn {
       
       // Fetch usernames for all senders
       const snapsWithUsernames = await Promise.all(
-        snaps.map(async (snap) => {
-          const senderUsername = await fetchUsername(snap.senderId);
-          return {
-            ...snap,
-            senderUsername
-          };
+        snaps.map(async (snap: Snap) => {
+          try {
+            const senderProfile = await getUserProfile(snap.senderId);
+            return {
+              ...snap,
+              senderUsername: senderProfile?.username || 'Unknown User'
+            };
+          } catch (error) {
+            console.warn(`Failed to fetch username for sender ${snap.senderId}:`, error);
+            return {
+              ...snap,
+              senderUsername: 'Unknown User'
+            };
+          }
         })
       );
       
@@ -107,7 +121,7 @@ export function useSnaps(): UseSnapsReturn {
       console.error('Error loading received snaps:', err);
       setError('Failed to load received snaps');
     }
-  }, [currentUser?.uid, fetchUsername]);
+  }, [currentUser?.uid]);
 
   /**
    * Load sent snaps for current user
@@ -164,8 +178,17 @@ export function useSnaps(): UseSnapsReturn {
         (progress) => setUploadProgress(progress)
       );
 
-      // Create snap documents for each recipient
-      const createSnapPromises = snapData.recipientIds.map(recipientId => {
+      // Store snap data in the snaps collection first
+      const snapId = await storeSnapData({
+        senderId: currentUser.uid,
+        storageUrl: uploadResult.downloadURL,
+        mediaType: snapData.mediaType,
+        duration: snapData.duration,
+      });
+
+      // Create snap documents and chat messages for each recipient
+      const sendSnapPromises = snapData.recipientIds.map(async (recipientId) => {
+        // Create the traditional snap document
         const snapDocData: CreateSnapData = {
           recipientId,
           mediaType: snapData.mediaType,
@@ -176,10 +199,17 @@ export function useSnaps(): UseSnapsReturn {
           hasDrawing: snapData.hasDrawing
         };
 
-        return createSnap(currentUser.uid, snapDocData);
+        // Create snap document
+        await createSnap(currentUser.uid, snapDocData);
+
+        // Create or get chat with this recipient
+        const chatId = await createOrGetChat(currentUser.uid, recipientId);
+        
+        // Send snap message to the chat
+        await sendSnapMessage(chatId, currentUser.uid, snapId);
       });
 
-      await Promise.all(createSnapPromises);
+      await Promise.all(sendSnapPromises);
 
       // Refresh sent snaps to show new ones
       await loadSentSnaps();

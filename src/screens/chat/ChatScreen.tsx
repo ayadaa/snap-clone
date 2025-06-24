@@ -35,7 +35,16 @@ export function ChatScreen() {
   const handleChatPress = (chat: ChatWithUser) => {
     (navigation as any).navigate('IndividualChat', {
       chatId: chat.id,
-      username: chat.otherUser.username,
+      otherUser: {
+        uid: chat.otherUser.uid,
+        email: chat.otherUser.email,
+        username: chat.otherUser?.username || 'Unknown User',
+        displayName: chat.otherUser.displayName,
+        profilePicture: chat.otherUser.profilePicture,
+        createdAt: chat.otherUser.createdAt,
+        lastSeen: chat.otherUser.lastSeen,
+        isOnline: chat.otherUser.isOnline || false,
+      },
     });
   };
 
@@ -176,7 +185,7 @@ export function ChatScreen() {
             marginRight: 16,
           }}>
             <Text style={{ fontSize: 18, color: '#FFFFFF' }}>
-              {chat.otherUser.username.charAt(0).toUpperCase()}
+              {chat.otherUser?.username?.charAt(0).toUpperCase() || '?'}
             </Text>
           </View>
 
@@ -192,7 +201,7 @@ export function ChatScreen() {
                 fontSize: 16,
                 fontWeight: 'bold',
               }}>
-                {chat.otherUser.username}
+                {chat.otherUser?.username || 'Unknown User'}
               </Text>
               <Text style={{
                 color: 'rgba(255, 255, 255, 0.6)',
@@ -212,7 +221,10 @@ export function ChatScreen() {
                 fontSize: 14,
                 flex: 1,
               }} numberOfLines={1}>
-                {chat.lastMessage?.text || 'No messages yet'}
+                {chat.lastMessage?.type === 'snap' 
+                  ? '📸 Snap' 
+                  : chat.lastMessage?.text || 'No messages yet'
+                }
               </Text>
               {chat.unreadCount > 0 && (
                 <View style={{

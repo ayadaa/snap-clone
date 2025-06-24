@@ -213,11 +213,11 @@ export default function GroupSettingsScreen() {
         <View style={styles.memberInfo}>
           <View style={styles.memberAvatar}>
             <Text style={styles.memberAvatarText}>
-              {item.username.charAt(0).toUpperCase()}
+              {item.username?.charAt(0).toUpperCase() || '?'}
             </Text>
           </View>
           <View style={styles.memberDetails}>
-            <Text style={styles.memberName}>{item.username}</Text>
+            <Text style={styles.memberName}>{item.username || 'Unknown User'}</Text>
             {item.displayName && (
               <Text style={styles.memberDisplayName}>{item.displayName}</Text>
             )}
@@ -231,7 +231,7 @@ export default function GroupSettingsScreen() {
         {canRemove && (
           <TouchableOpacity
             style={styles.removeMemberButton}
-            onPress={() => handleRemoveMember(item.uid, item.username)}
+            onPress={() => handleRemoveMember(item.uid, item.username || '')}
           >
             <Ionicons name="remove-circle" size={24} color="#FF3B30" />
           </TouchableOpacity>

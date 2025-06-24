@@ -133,12 +133,14 @@ export default function GroupChatScreen() {
           message={{
             id: item.id,
             text: item.text || '',
+            snapId: item.snapId,
             senderId: item.senderId,
             timestamp: item.timestamp,
-            type: 'text',
+            type: item.type === 'snap' ? 'snap' : 'text',
             status: 'sent',
           }}
           isCurrentUser={isOwnMessage}
+          chatType="group"
         />
         {/* Read receipts for group messages */}
         {isOwnMessage && item.readBy.length > 1 && (

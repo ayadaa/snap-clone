@@ -17,47 +17,33 @@ import {
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Video, ResizeMode } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../../config/firebase';
 import { Screen } from '../../components/common/Screen';
-import { useSnaps } from '../../hooks/snaps/use-snaps';
+import { getSnapData, getUserProfile, markSnapAsViewed, type SnapData } from '../../services/firebase/firestore.service';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../store';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 type SnapViewerScreenRouteProp = RouteProp<{
   SnapViewer: {
     snapId: string;
+    chatType?: 'individual' | 'group';
+    senderId?: string;
   };
 }, 'SnapViewer'>;
-
-interface SnapData {
-  id: string;
-  senderId: string;
-  recipientId: string;
-  mediaType: 'photo' | 'video';
-  downloadURL: string;
-  duration: number;
-  viewed: boolean;
-  createdAt: any;
-  expiresAt: any;
-}
-
-interface UserData {
-  username: string;
-  email: string;
-}
 
 export function SnapViewerScreen() {
   const navigation = useNavigation();
   const route = useRoute<SnapViewerScreenRouteProp>();
-  const { snapId } = route.params;
+  const { snapId, chatType = 'individual', senderId } = route.params;
+  const currentUserId = useSelector((state: RootState) => state.auth.user?.uid);
   
-  const { markSnapAsViewed } = useSnaps();
   const [snap, setSnap] = useState<SnapData | null>(null);
   const [senderUsername, setSenderUsername] = useState<string>('unknown_user');
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [isViewing, setIsViewing] = useState(false);
   const [hasViewed, setHasViewed] = useState(false);
+  const [alreadyViewed, setAlreadyViewed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -73,33 +59,37 @@ export function SnapViewerScreen() {
         console.log('Fetching snap data for ID:', snapId);
         
         // Fetch snap document
-        const snapDoc = await getDoc(doc(db, 'snaps', snapId));
+        const snapData = await getSnapData(snapId);
         
-        if (!snapDoc.exists()) {
+        if (!snapData) {
           setError('Snap not found');
           setLoading(false);
           return;
         }
 
-        const snapData = { id: snapDoc.id, ...snapDoc.data() } as SnapData;
         console.log('Snap data loaded:', snapData);
         
+        // Check if current user has already viewed this snap
+        const hasAlreadyViewed = currentUserId ? snapData.viewers.includes(currentUserId) : false;
+        setAlreadyViewed(hasAlreadyViewed);
+        
         // Fetch sender's username
-        const senderDoc = await getDoc(doc(db, 'users', snapData.senderId));
-        if (senderDoc.exists()) {
-          const senderData = senderDoc.data() as UserData;
-          setSenderUsername(senderData.username);
-          console.log('Sender username:', senderData.username);
+        const senderProfile = await getUserProfile(snapData.senderId);
+        if (senderProfile) {
+          setSenderUsername(senderProfile.username);
+          console.log('Sender username:', senderProfile.username);
         }
         
         setSnap(snapData);
-        setTimeLeft(snapData.duration);
+        setTimeLeft(snapData.duration || 5); // Default to 5 seconds if no duration
         setIsViewing(true);
         setLoading(false);
         
-        // Mark as viewed immediately
-        markSnapAsViewed(snapId);
-        setHasViewed(true);
+        // Mark as viewed immediately (only if not already viewed)
+        if (currentUserId && !hasAlreadyViewed) {
+          await markSnapAsViewed(snapId, currentUserId);
+          setHasViewed(true);
+        }
         
       } catch (err) {
         console.error('Error fetching snap data:', err);
@@ -115,7 +105,7 @@ export function SnapViewerScreen() {
         clearInterval(timerRef.current);
       }
     };
-  }, [snapId, markSnapAsViewed]);
+  }, [snapId, currentUserId]);
 
   /**
    * Start countdown timer for photos
@@ -217,7 +207,7 @@ export function SnapViewerScreen() {
       <View style={styles.mediaContainer}>
         {snap.mediaType === 'photo' ? (
           <Image
-            source={{ uri: snap.downloadURL }}
+            source={{ uri: snap.storageUrl }}
             style={styles.media}
             resizeMode="cover"
             onError={(error) => {
@@ -231,7 +221,7 @@ export function SnapViewerScreen() {
         ) : (
           <Video
             ref={videoRef}
-            source={{ uri: snap.downloadURL }}
+            source={{ uri: snap.storageUrl }}
             style={styles.media}
             shouldPlay
             isLooping={false}
@@ -255,6 +245,11 @@ export function SnapViewerScreen() {
           
           <View style={styles.senderInfo}>
             <Text style={styles.senderText}>from {senderUsername}</Text>
+            {chatType === 'group' && (
+              <Text style={styles.groupInfo}>
+                {alreadyViewed ? '👁️ Already viewed' : '👀 New snap'} • {snap.viewCount} view{snap.viewCount !== 1 ? 's' : ''}
+              </Text>
+            )}
             {snap.mediaType === 'photo' && (
               <Text style={styles.timerText}>{timeLeft}s</Text>
             )}
@@ -267,7 +262,7 @@ export function SnapViewerScreen() {
             <View 
               style={[
                 styles.timerBar,
-                { width: `${(timeLeft / snap.duration) * 100}%` }
+                { width: `${(timeLeft / (snap.duration || 5)) * 100}%` }
               ]} 
             />
           </View>
@@ -276,11 +271,18 @@ export function SnapViewerScreen() {
         {/* Instructions */}
         <View style={styles.footer}>
           <Text style={styles.instructionText}>
-            {snap.mediaType === 'photo' 
-              ? 'Tap to close' 
-              : 'Video will close automatically'
+            {alreadyViewed && chatType === 'group'
+              ? 'You\'ve already viewed this snap'
+              : snap.mediaType === 'photo' 
+                ? 'Tap to close' 
+                : 'Video will close automatically'
             }
           </Text>
+          {chatType === 'group' && !alreadyViewed && (
+            <Text style={[styles.instructionText, { fontSize: 12, marginTop: 4 }]}>
+              This view will be recorded
+            </Text>
+          )}
         </View>
       </View>
 
@@ -414,5 +416,12 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+  },
+  groupInfo: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
 }); 

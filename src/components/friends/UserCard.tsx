@@ -73,14 +73,14 @@ export function UserCard({
       <View style={styles.avatarContainer}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>
-            {user.username.charAt(0).toUpperCase()}
+            {user.username?.charAt(0).toUpperCase() || '?'}
           </Text>
         </View>
       </View>
 
       {/* User Info */}
       <View style={styles.userInfo}>
-        <Text style={styles.username}>{user.username}</Text>
+        <Text style={styles.username}>{user.username || 'Unknown User'}</Text>
         {user.displayName && (
           <Text style={styles.displayName}>{user.displayName}</Text>
         )}

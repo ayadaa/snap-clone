@@ -58,12 +58,12 @@ export function FriendRequestCard({
       <View style={styles.userSection}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>
-            {requestingUser.username.charAt(0).toUpperCase()}
+            {requestingUser.username?.charAt(0).toUpperCase() || '?'}
           </Text>
         </View>
         
         <View style={styles.userInfo}>
-          <Text style={styles.username}>{requestingUser.username}</Text>
+          <Text style={styles.username}>{requestingUser.username || 'Unknown User'}</Text>
           {requestingUser.displayName && (
             <Text style={styles.displayName}>{requestingUser.displayName}</Text>
           )}

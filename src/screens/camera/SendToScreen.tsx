@@ -1,6 +1,6 @@
 /**
  * Send To Screen
- * Allows users to select friends to send their snap to or post to their story
+ * Allows users to select friends, groups to send their snap to or post to their story
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
@@ -21,9 +21,11 @@ import { Screen } from '../../components/common/Screen';
 import { Button } from '../../components/common/Button';
 import { UserCard } from '../../components/friends/UserCard';
 import { useFriends } from '../../hooks/friends/use-friends';
+import { useGroups } from '../../hooks/chat/use-groups';
 import { useSnaps } from '../../hooks/snaps/use-snaps';
 import { useStories } from '../../hooks/stories/use-stories';
 import { uploadSnap } from '../../services/firebase/storage.service';
+import { sendGroupMessage, storeSnapData } from '../../services/firebase/firestore.service';
 import { CameraStackParamList } from '../../types/navigation';
 import type { RootState } from '../../store';
 
@@ -43,10 +45,12 @@ export function SendToScreen({}: SendToScreenProps) {
   const { mediaUri, mediaType, duration, hasText, hasDrawing } = route.params;
   
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
+  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [isPostingToStory, setIsPostingToStory] = useState(false);
   
   const { friends, isLoadingFriends: friendsLoading, friendsError } = useFriends();
+  const { groups, loading: groupsLoading, error: groupsError } = useGroups(user?.uid || '');
   const { sendSnap, uploadProgress, error: snapError } = useSnaps();
   const { addToStory, userStory } = useStories(user?.uid || '');
 
@@ -59,6 +63,19 @@ export function SendToScreen({}: SendToScreenProps) {
         return prev.filter(id => id !== friendId);
       } else {
         return [...prev, friendId];
+      }
+    });
+  }, []);
+
+  /**
+   * Toggle group selection
+   */
+  const toggleGroupSelection = useCallback((groupId: string) => {
+    setSelectedGroups(prev => {
+      if (prev.includes(groupId)) {
+        return prev.filter(id => id !== groupId);
+      } else {
+        return [...prev, groupId];
       }
     });
   }, []);
@@ -109,29 +126,71 @@ export function SendToScreen({}: SendToScreenProps) {
   }, [user, mediaUri, mediaType, duration, addToStory, navigation]);
 
   /**
-   * Handle sending snap to selected friends
+   * Handle sending snap to selected friends and groups
    */
   const handleSendSnap = useCallback(async () => {
-    if (selectedFriends.length === 0) {
-      Alert.alert('No Recipients', 'Please select at least one friend to send your snap to.');
+    const totalRecipients = selectedFriends.length + selectedGroups.length;
+    
+    if (totalRecipients === 0) {
+      Alert.alert('No Recipients', 'Please select at least one friend or group to send your snap to.');
       return;
     }
 
     setIsSending(true);
 
     try {
-      await sendSnap({
-        recipientIds: selectedFriends,
-        mediaUri,
-        mediaType,
-        duration,
-        hasText,
-        hasDrawing
-      });
+      // Send to individual friends if any selected
+      if (selectedFriends.length > 0) {
+        await sendSnap({
+          recipientIds: selectedFriends,
+          mediaUri,
+          mediaType,
+          duration,
+          hasText,
+          hasDrawing
+        });
+      }
+
+      // Send to groups if any selected
+      if (selectedGroups.length > 0 && user) {
+        // Upload snap to storage first
+        const uploadResult = await uploadSnap(mediaUri, user.uid, mediaType);
+        
+        // Store snap data in the snaps collection
+        const snapId = await storeSnapData({
+          senderId: user.uid,
+          storageUrl: uploadResult.downloadURL,
+          mediaType,
+          duration,
+        });
+        
+        // Send snap message to each selected group
+        for (const groupId of selectedGroups) {
+          await sendGroupMessage(groupId, {
+            senderId: user.uid,
+            type: 'snap',
+            snapId: snapId,
+          });
+        }
+      }
+
+      const friendsText = selectedFriends.length > 0 
+        ? `${selectedFriends.length} friend${selectedFriends.length > 1 ? 's' : ''}`
+        : '';
+      const groupsText = selectedGroups.length > 0 
+        ? `${selectedGroups.length} group${selectedGroups.length > 1 ? 's' : ''}`
+        : '';
+      
+      let recipientText = '';
+      if (friendsText && groupsText) {
+        recipientText = `${friendsText} and ${groupsText}`;
+      } else {
+        recipientText = friendsText || groupsText;
+      }
 
       Alert.alert(
         'Snap Sent!',
-        `Your snap was sent to ${selectedFriends.length} friend${selectedFriends.length > 1 ? 's' : ''}.`,
+        `Your snap was sent to ${recipientText}.`,
         [
           {
             text: 'OK',
@@ -149,7 +208,7 @@ export function SendToScreen({}: SendToScreenProps) {
     } finally {
       setIsSending(false);
     }
-  }, [selectedFriends, sendSnap, mediaUri, mediaType, duration, hasText, hasDrawing, navigation]);
+  }, [selectedFriends, selectedGroups, sendSnap, mediaUri, mediaType, duration, hasText, hasDrawing, user, navigation]);
 
   /**
    * Handle back navigation
@@ -239,6 +298,50 @@ export function SendToScreen({}: SendToScreenProps) {
   }, [selectedFriends, toggleFriendSelection, isSending, isPostingToStory]);
 
   /**
+   * Render group item with selection state
+   */
+  const renderGroupItem = useCallback(({ item: group }: { item: any }) => {
+    const isSelected = selectedGroups.includes(group.id);
+    
+    return (
+      <TouchableOpacity
+        onPress={() => toggleGroupSelection(group.id)}
+        style={[styles.groupItem, (isSending || isPostingToStory) && styles.disabled]}
+        disabled={isSending || isPostingToStory}
+      >
+        <View style={styles.groupItemContent}>
+          {/* Group avatar */}
+          <View style={styles.groupAvatar}>
+            <Ionicons name="people" size={24} color="#3B82F6" />
+          </View>
+          
+          {/* Group info */}
+          <View style={styles.groupInfo}>
+            <Text style={styles.groupName}>{group.name}</Text>
+            <Text style={styles.groupMembers}>
+              {group.participants.length} member{group.participants.length !== 1 ? 's' : ''}
+            </Text>
+          </View>
+          
+          {/* Selection indicator */}
+          <View style={styles.selectionIndicator}>
+            <View
+              style={[
+                styles.checkbox,
+                isSelected ? styles.checkboxSelected : styles.checkboxUnselected
+              ]}
+            >
+              {isSelected && (
+                <Ionicons name="checkmark" size={16} color="white" />
+              )}
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  }, [selectedGroups, toggleGroupSelection, isSending, isPostingToStory]);
+
+  /**
    * Show error alert if there's an error
    */
   useEffect(() => {
@@ -248,7 +351,10 @@ export function SendToScreen({}: SendToScreenProps) {
     if (snapError) {
       Alert.alert('Send Error', snapError);
     }
-  }, [friendsError, snapError]);
+    if (groupsError) {
+      Alert.alert('Groups Error', groupsError);
+    }
+  }, [friendsError, snapError, groupsError]);
 
   return (
     <Screen style={styles.container}>
@@ -274,16 +380,48 @@ export function SendToScreen({}: SendToScreenProps) {
         {renderMyStoryOption()}
       </View>
 
+      {/* Groups Section */}
+      {groups.length > 0 && (
+        <>
+          <View style={styles.divider}>
+            <Text style={styles.dividerText}>Send to Groups</Text>
+          </View>
+          
+          <View style={styles.groupsList}>
+            {groupsLoading ? (
+              <View style={styles.centered}>
+                <ActivityIndicator size="large" color="#3B82F6" />
+                <Text style={styles.loadingText}>Loading groups...</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={groups}
+                renderItem={renderGroupItem}
+                keyExtractor={(item) => item.id}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.flatListContent}
+                scrollEnabled={false}
+              />
+            )}
+          </View>
+        </>
+      )}
+
       {/* Divider */}
       <View style={styles.divider}>
         <Text style={styles.dividerText}>Send to Friends</Text>
       </View>
 
       {/* Selected count */}
-      {selectedFriends.length > 0 && (
+      {(selectedFriends.length > 0 || selectedGroups.length > 0) && (
         <View style={styles.selectedCount}>
           <Text style={styles.selectedCountText}>
-            {selectedFriends.length} friend{selectedFriends.length > 1 ? 's' : ''} selected
+            {selectedFriends.length > 0 && selectedGroups.length > 0
+              ? `${selectedFriends.length} friend${selectedFriends.length > 1 ? 's' : ''} and ${selectedGroups.length} group${selectedGroups.length > 1 ? 's' : ''} selected`
+              : selectedFriends.length > 0
+              ? `${selectedFriends.length} friend${selectedFriends.length > 1 ? 's' : ''} selected`
+              : `${selectedGroups.length} group${selectedGroups.length > 1 ? 's' : ''} selected`
+            }
           </Text>
         </View>
       )}
@@ -331,19 +469,35 @@ export function SendToScreen({}: SendToScreenProps) {
       </View>
 
       {/* Send button */}
-      {friends.length > 0 && (
+      {(friends.length > 0 || groups.length > 0) && (
         <View style={styles.sendButtonContainer}>
           <Button
             title={isSending 
               ? "Sending..." 
-              : `Send to ${selectedFriends.length} friend${selectedFriends.length !== 1 ? 's' : ''}`
+              : (() => {
+                  const totalSelected = selectedFriends.length + selectedGroups.length;
+                  if (totalSelected === 0) return "Select recipients";
+                  
+                  const friendsText = selectedFriends.length > 0 
+                    ? `${selectedFriends.length} friend${selectedFriends.length > 1 ? 's' : ''}`
+                    : '';
+                  const groupsText = selectedGroups.length > 0 
+                    ? `${selectedGroups.length} group${selectedGroups.length > 1 ? 's' : ''}`
+                    : '';
+                  
+                  if (friendsText && groupsText) {
+                    return `Send to ${friendsText} and ${groupsText}`;
+                  } else {
+                    return `Send to ${friendsText || groupsText}`;
+                  }
+                })()
             }
             onPress={handleSendSnap}
-            disabled={selectedFriends.length === 0 || isSending || isPostingToStory}
+            disabled={selectedFriends.length === 0 && selectedGroups.length === 0 || isSending || isPostingToStory}
             loading={isSending}
             style={{
               ...styles.sendButton,
-              ...(selectedFriends.length > 0 && !isSending && !isPostingToStory
+              ...((selectedFriends.length > 0 || selectedGroups.length > 0) && !isSending && !isPostingToStory
                 ? styles.sendButtonActive 
                 : styles.sendButtonDisabled)
             }}
@@ -410,6 +564,10 @@ const styles = StyleSheet.create({
   friendsList: {
     flex: 1,
     paddingHorizontal: 16,
+  },
+  groupsList: {
+    paddingHorizontal: 16,
+    maxHeight: 200, // Limit height so friends list is still visible
   },
   centered: {
     flex: 1,
@@ -516,5 +674,38 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     fontWeight: '600',
+  },
+  groupItem: {
+    marginBottom: 12,
+  },
+  groupItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    position: 'relative',
+  },
+  groupAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  groupInfo: {
+    flex: 1,
+  },
+  groupName: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  groupMembers: {
+    color: '#9CA3AF',
+    fontSize: 14,
+    marginTop: 2,
   },
 }); 
