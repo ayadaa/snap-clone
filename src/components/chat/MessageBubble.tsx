@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Alert, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useSelector } from 'react-redux';
 import { type Message, getSnapData, type SnapData } from '../../services/firebase/firestore.service';
 import { type NavigationProp } from '../../types/navigation';
+import { type RootState } from '../../store';
 
 interface MessageBubbleProps {
   message: Message;
@@ -14,31 +16,56 @@ interface MessageBubbleProps {
 /**
  * Message bubble component for displaying individual chat messages.
  * Uses glassmorphic design with different styles for sent/received messages.
- * Supports both text and snap messages.
+ * Supports both text and snap messages with ephemeral behavior.
+ * Snaps disappear after being viewed by the current user.
  */
 export function MessageBubble({ message, isCurrentUser, chatType = 'individual' }: MessageBubbleProps) {
   const navigation = useNavigation<NavigationProp>();
+  const currentUser = useSelector((state: RootState) => state.auth.user);
   const [snapData, setSnapData] = useState<SnapData | null>(null);
   const [loadingSnap, setLoadingSnap] = useState(false);
+  const [hasViewedSnap, setHasViewedSnap] = useState(false);
 
   /**
    * Load snap data if this is a snap message
    */
-  useEffect(() => {
-    if (message.type === 'snap' && message.snapId) {
+  const loadSnapData = React.useCallback(async () => {
+    if (message.type === 'snap' && message.snapId && currentUser) {
       setLoadingSnap(true);
-      getSnapData(message.snapId)
-        .then(data => {
-          setSnapData(data);
-        })
-        .catch(error => {
-          console.error('Failed to load snap data:', error);
-        })
-        .finally(() => {
-          setLoadingSnap(false);
-        });
+      try {
+        const data = await getSnapData(message.snapId);
+        setSnapData(data);
+        // Check if current user has already viewed this snap
+        if (data && data.viewers.includes(currentUser.uid)) {
+          setHasViewedSnap(true);
+        } else {
+          setHasViewedSnap(false);
+        }
+      } catch (error) {
+        console.error('Failed to load snap data:', error);
+      } finally {
+        setLoadingSnap(false);
+      }
     }
-  }, [message.type, message.snapId]);
+  }, [message.type, message.snapId, currentUser]);
+
+  /**
+   * Initial load of snap data
+   */
+  useEffect(() => {
+    loadSnapData();
+  }, [loadSnapData]);
+
+  /**
+   * Refresh snap data when screen comes into focus (e.g., returning from SnapViewer)
+   */
+  useFocusEffect(
+    React.useCallback(() => {
+      if (message.type === 'snap') {
+        loadSnapData();
+      }
+    }, [loadSnapData, message.type])
+  );
 
   const formatTime = (timestamp: any): string => {
     if (!timestamp) return '';
@@ -51,7 +78,7 @@ export function MessageBubble({ message, isCurrentUser, chatType = 'individual' 
    * Handle snap message tap
    */
   const handleSnapTap = () => {
-    if (message.type === 'snap' && message.snapId && snapData) {
+    if (message.type === 'snap' && message.snapId && snapData && !hasViewedSnap) {
       // Navigate to snap viewer for both individual and group chats
       navigation.navigate('SnapViewer', {
         snapId: message.snapId,
@@ -65,6 +92,47 @@ export function MessageBubble({ message, isCurrentUser, chatType = 'individual' 
    * Render snap message content
    */
   const renderSnapContent = () => {
+    // If user has already viewed the snap, show "viewed" state
+    if (hasViewedSnap && !isCurrentUser) {
+      return (
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingVertical: 8,
+          opacity: 0.6,
+        }}>
+          <View style={{
+            width: 60,
+            height: 60,
+            borderRadius: 8,
+            backgroundColor: 'rgba(255, 255, 255, 0.05)',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: 12,
+          }}>
+            <Ionicons name="eye" size={24} color="rgba(255, 255, 255, 0.4)" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{
+              color: 'rgba(255, 255, 255, 0.6)',
+              fontSize: 16,
+              fontWeight: '500',
+              fontStyle: 'italic',
+            }}>
+              Snap viewed
+            </Text>
+            <Text style={{
+              color: 'rgba(255, 255, 255, 0.4)',
+              fontSize: 14,
+              marginTop: 2,
+            }}>
+              This snap has been opened
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
     if (loadingSnap) {
       return (
         <View style={{
@@ -201,6 +269,12 @@ export function MessageBubble({ message, isCurrentUser, chatType = 'individual' 
       </TouchableOpacity>
     );
   };
+
+  // Don't render the message at all if it's a viewed snap from another user
+  // This creates the true "ephemeral" experience where snaps disappear completely
+  if (message.type === 'snap' && hasViewedSnap && !isCurrentUser && !loadingSnap) {
+    return null;
+  }
 
   return (
     <View
