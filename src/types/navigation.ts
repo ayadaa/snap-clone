@@ -16,6 +16,13 @@ export type CameraStackParamList = {
     mediaUri: string;
     mediaType: 'photo' | 'video';
   };
+  SendTo: {
+    mediaUri: string;
+    mediaType: 'photo' | 'video';
+    duration: number;
+    hasText?: boolean;
+    hasDrawing?: boolean;
+  };
 };
 
 export type MainTabParamList = {

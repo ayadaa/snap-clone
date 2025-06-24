@@ -26,7 +26,7 @@ interface SnapEditorProps {
   mediaType: 'photo' | 'video';
   onSave: (editedData: any) => void;
   onCancel: () => void;
-  onNext: () => void;
+  onNext: (editedData: { hasText?: boolean; hasDrawing?: boolean; duration?: number }) => void;
 }
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -171,6 +171,18 @@ export function SnapEditor({
       hasEdits: hasContent(),
     };
     onSave(editedData);
+  };
+
+  /**
+   * Handle next action with edited data
+   */
+  const handleNext = () => {
+    const editedData = {
+      hasText: editorState.textOverlays.length > 0,
+      hasDrawing: editorState.drawingPaths.length > 0,
+      duration: editorState.timerDuration,
+    };
+    onNext(editedData);
   };
 
   return (
@@ -351,7 +363,7 @@ export function SnapEditor({
         )}
 
         {/* Next Button */}
-        <TouchableOpacity style={styles.nextButton} onPress={onNext}>
+                    <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
           <Text style={styles.nextButtonText}>Next</Text>
           <Ionicons name="arrow-forward" size={20} color="white" />
         </TouchableOpacity>

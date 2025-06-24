@@ -41,12 +41,18 @@ export function SnapEditorScreen() {
   };
 
   /**
-   * Handle next action - proceed to sharing
+   * Handle next action - proceed to sending
    */
-  const handleNext = () => {
-    // TODO: Navigate to sharing screen in Phase 1
-    console.log('Proceeding to sharing...');
-    Alert.alert('Coming Soon', 'Sharing functionality will be added in the next phase!');
+  const handleNext = (editedData: { hasText?: boolean; hasDrawing?: boolean; duration?: number }) => {
+    console.log('Proceeding to sending with data:', editedData);
+    
+    navigation.navigate('SendTo', {
+      mediaUri,
+      mediaType,
+      duration: editedData.duration || (mediaType === 'photo' ? 5 : 15), // Default durations
+      hasText: editedData.hasText || false,
+      hasDrawing: editedData.hasDrawing || false,
+    });
   };
 
   return (
