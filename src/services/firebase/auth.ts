@@ -3,6 +3,7 @@ import {
   signInWithEmailAndPassword, 
   signOut, 
   updateProfile,
+  sendPasswordResetEmail,
   User as FirebaseUser 
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -113,4 +114,16 @@ export function getCurrentUser(): FirebaseUser | null {
  */
 export function isAuthenticated(): boolean {
   return auth.currentUser !== null;
+}
+
+/**
+ * Send password reset email to user
+ */
+export async function resetPassword(email: string): Promise<void> {
+  try {
+    await sendPasswordResetEmail(auth, email);
+  } catch (error: any) {
+    console.error('Password reset error:', error);
+    throw new Error(error.message || 'Failed to send password reset email');
+  }
 } 

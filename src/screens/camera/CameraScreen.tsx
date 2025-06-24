@@ -79,15 +79,15 @@ export function CameraScreen() {
           </TouchableOpacity>
 
           <View style={{ alignItems: 'center' }}>
-            <Text
-              style={{
-                color: '#FFFFFF',
-                fontSize: 18,
-                fontWeight: 'bold',
-              }}
-            >
-              SnapClone
-            </Text>
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 18,
+              fontWeight: 'bold',
+            }}
+          >
+            SnapClone
+          </Text>
             <TouchableOpacity
               onPress={handleLogout}
               style={{
