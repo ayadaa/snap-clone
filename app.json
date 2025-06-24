@@ -13,13 +13,22 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app needs access to the camera to take photos and videos for snaps.",
+        "NSMicrophoneUsageDescription": "This app needs access to the microphone to record videos with audio."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ],
       "edgeToEdgeEnabled": true
     },
     "web": {
@@ -27,7 +36,10 @@
     },
     "plugins": [
       "expo-notifications",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-camera",
+      "expo-av",
+      "expo-media-library"
     ]
   }
 }

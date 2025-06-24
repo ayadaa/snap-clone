@@ -1,231 +1,228 @@
-import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, Alert, StyleSheet } from 'react-native';
+import { CameraView } from 'expo-camera';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { CameraStackParamList } from '../../types/navigation';
 import { Screen } from '../../components/common/Screen';
-import { useAppDispatch } from '../../store/hooks';
-import { clearUser } from '../../store/slices/auth.slice';
-import { signOutUser } from '../../services/firebase/auth';
+import { CameraControls } from '../../components/camera/CameraControls';
+import { useCamera } from '../../hooks/camera/use-camera';
 
 /**
  * Camera screen component - the heart of SnapClone.
- * Phase 0 implementation with placeholder UI and basic navigation elements.
- * Will be enhanced with Expo Camera integration in Phase 1.
+ * Features full camera functionality with photo/video capture,
+ * camera controls, and navigation to snap editing.
  */
+type CameraScreenNavigationProp = StackNavigationProp<CameraStackParamList, 'CameraCapture'>;
+
 export function CameraScreen() {
-  const dispatch = useAppDispatch();
+  const navigation = useNavigation<CameraScreenNavigationProp>();
+  const {
+    // Permissions
+    hasCameraPermission,
+    hasAudioPermission,
+    requestPermissions,
+    
+    // Camera settings
+    cameraType,
+    flashMode,
+    toggleCameraType,
+    toggleFlashMode,
+    
+    // Recording state
+    isRecording,
+    recordingDuration,
+    formatRecordingDuration,
+    
+    // Camera operations
+    cameraRef,
+    takePhoto,
+    startRecording,
+    stopRecording,
+  } = useCamera();
 
-  const handleProfilePress = () => {
-    console.log('Profile pressed');
-    // TODO: Navigate to profile screen
-  };
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleLogout = async () => {
+  /**
+   * Request camera permissions on mount
+   */
+  useEffect(() => {
+    async function setupCamera() {
+      setIsLoading(true);
+      const permissions = await requestPermissions();
+      
+      if (!permissions.camera) {
+        Alert.alert(
+          'Camera Permission Required',
+          'Please enable camera access in your device settings to use SnapClone.',
+          [{ text: 'OK' }]
+        );
+      }
+      
+      if (!permissions.audio) {
+        Alert.alert(
+          'Microphone Permission Required',
+          'Please enable microphone access to record videos with audio.',
+          [{ text: 'OK' }]
+        );
+      }
+      
+      setIsLoading(false);
+    }
+
+    setupCamera();
+  }, [requestPermissions]);
+
+  /**
+   * Handle photo capture
+   */
+  const handleCapture = async () => {
     try {
-      await signOutUser();
-      dispatch(clearUser());
-      console.log('Logged out successfully');
+      const photo = await takePhoto();
+      if (photo) {
+        // Navigate to snap editor with photo
+        navigation.navigate('SnapEditor', {
+          mediaUri: photo.uri,
+          mediaType: 'photo',
+        });
+      }
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('Error capturing photo:', error);
+      Alert.alert('Error', 'Failed to capture photo');
     }
   };
 
-  const handleSearchPress = () => {
-    console.log('Search pressed');
-    // TODO: Navigate to search/add friends screen
+  /**
+   * Handle video recording start
+   */
+  const handleStartRecording = async () => {
+    try {
+      // Pass auto-stop callback to handle navigation when video auto-stops at 15s
+      await startRecording((video) => {
+        console.log('Auto-stop callback triggered with video:', video);
+        if (video) {
+          navigation.navigate('SnapEditor', {
+            mediaUri: video.uri,
+            mediaType: 'video',
+          });
+        }
+      });
+    } catch (error) {
+      console.error('Error starting recording:', error);
+      Alert.alert('Error', 'Failed to start recording');
+    }
   };
 
-  const handleCapturePress = () => {
-    console.log('Capture pressed');
-    // TODO: Implement camera capture functionality
+  /**
+   * Handle video recording stop
+   */
+  const handleStopRecording = async () => {
+    try {
+      const video = await stopRecording();
+      console.log('Manual stop with video:', video);
+      if (video) {
+        // Navigate to snap editor with video
+        navigation.navigate('SnapEditor', {
+          mediaUri: video.uri,
+          mediaType: 'video',
+        });
+      }
+    } catch (error) {
+      console.error('Error stopping recording:', error);
+      Alert.alert('Error', 'Failed to stop recording');
+    }
   };
 
-  const handleFlipCamera = () => {
-    console.log('Flip camera pressed');
-    // TODO: Implement camera flip functionality
-  };
+  // Show loading screen while setting up camera
+  if (isLoading) {
+    return (
+      <Screen backgroundColor="#000000" statusBarStyle="light-content">
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Setting up camera...</Text>
+        </View>
+      </Screen>
+    );
+  }
 
-  const handleFlashToggle = () => {
-    console.log('Flash toggle pressed');
-    // TODO: Implement flash toggle functionality
-  };
+  // Show permission denied screen
+  if (!hasCameraPermission) {
+    return (
+      <Screen backgroundColor="#000000" statusBarStyle="light-content">
+        <View style={styles.permissionContainer}>
+          <Text style={styles.permissionTitle}>Camera Access Required</Text>
+          <Text style={styles.permissionText}>
+            Please enable camera access in your device settings to use SnapClone.
+          </Text>
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen backgroundColor="#000000" statusBarStyle="light-content">
-      <View style={{ flex: 1 }}>
-        {/* Header */}
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            paddingHorizontal: 20,
-            paddingTop: 16,
-            paddingBottom: 16,
-          }}
+      <View style={styles.container}>
+        {/* Camera View */}
+        <CameraView
+          ref={cameraRef}
+          style={styles.camera}
+          facing={cameraType}
+          flash={flashMode}
+          ratio="16:9"
         >
-          <TouchableOpacity
-            onPress={handleProfilePress}
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' }}>
-              👤
-            </Text>
-          </TouchableOpacity>
-
-          <View style={{ alignItems: 'center' }}>
-          <Text
-            style={{
-              color: '#FFFFFF',
-              fontSize: 18,
-              fontWeight: 'bold',
-            }}
-          >
-            SnapClone
-          </Text>
-            <TouchableOpacity
-              onPress={handleLogout}
-              style={{
-                marginTop: 4,
-                paddingHorizontal: 8,
-                paddingVertical: 2,
-                backgroundColor: 'rgba(255, 0, 0, 0.3)',
-                borderRadius: 8,
-              }}
-            >
-              <Text style={{ color: '#FFFFFF', fontSize: 10 }}>
-                Logout
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity
-            onPress={handleSearchPress}
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Text style={{ color: '#FFFFFF', fontSize: 16 }}>🔍</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Camera Preview Placeholder */}
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: '#1A1A1A',
-            margin: 20,
-            borderRadius: 20,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Text
-            style={{
-              color: 'rgba(255, 255, 255, 0.6)',
-              fontSize: 18,
-              textAlign: 'center',
-              marginBottom: 16,
-            }}
-          >
-            📸
-          </Text>
-          <Text
-            style={{
-              color: 'rgba(255, 255, 255, 0.6)',
-              fontSize: 16,
-              textAlign: 'center',
-              marginBottom: 8,
-            }}
-          >
-            Camera Preview
-          </Text>
-          <Text
-            style={{
-              color: 'rgba(255, 255, 255, 0.4)',
-              fontSize: 12,
-              textAlign: 'center',
-            }}
-          >
-            Phase 1: Expo Camera Integration
-          </Text>
-        </View>
-
-        {/* Camera Controls */}
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            paddingHorizontal: 40,
-            paddingBottom: 40,
-          }}
-        >
-          {/* Flash Toggle */}
-          <TouchableOpacity
-            onPress={handleFlashToggle}
-            style={{
-              width: 50,
-              height: 50,
-              borderRadius: 25,
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Text style={{ color: '#FFFFFF', fontSize: 20 }}>⚡</Text>
-          </TouchableOpacity>
-
-          {/* Capture Button */}
-          <TouchableOpacity
-            onPress={handleCapturePress}
-            style={{
-              width: 80,
-              height: 80,
-              borderRadius: 40,
-              backgroundColor: '#FFFFFF',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderWidth: 4,
-              borderColor: 'rgba(255, 255, 255, 0.3)',
-            }}
-          >
-            <View
-              style={{
-                width: 60,
-                height: 60,
-                borderRadius: 30,
-                backgroundColor: '#FFFFFF',
-              }}
-            />
-          </TouchableOpacity>
-
-          {/* Flip Camera */}
-          <TouchableOpacity
-            onPress={handleFlipCamera}
-            style={{
-              width: 50,
-              height: 50,
-              borderRadius: 25,
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Text style={{ color: '#FFFFFF', fontSize: 20 }}>🔄</Text>
-          </TouchableOpacity>
-        </View>
+          {/* Camera Controls Overlay */}
+          <CameraControls
+            cameraType={cameraType}
+            flashMode={flashMode}
+            isRecording={isRecording}
+            recordingDuration={recordingDuration}
+            onToggleCamera={toggleCameraType}
+            onToggleFlash={toggleFlashMode}
+            onCapture={handleCapture}
+            onStartRecording={handleStartRecording}
+            onStopRecording={handleStopRecording}
+            formatRecordingDuration={formatRecordingDuration}
+          />
+        </CameraView>
       </View>
     </Screen>
   );
-} 
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  camera: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '500',
+  },
+  permissionContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  permissionTitle: {
+    color: 'white',
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  permissionText: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 16,
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+});
+ 

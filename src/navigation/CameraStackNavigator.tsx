@@ -1,0 +1,36 @@
+import React from 'react';
+import { createStackNavigator } from '@react-navigation/stack';
+import { CameraScreen } from '../screens/camera/CameraScreen';
+import { SnapEditorScreen } from '../screens/camera/SnapEditorScreen';
+import { CameraStackParamList } from '../types/navigation';
+
+const Stack = createStackNavigator<CameraStackParamList>();
+
+/**
+ * Camera stack navigator for camera flow.
+ * Handles navigation between camera capture and snap editing.
+ * Provides seamless transition from capture to editing workflow.
+ */
+export function CameraStackNavigator() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+        gestureEnabled: false,
+      }}
+      initialRouteName="CameraCapture"
+    >
+      <Stack.Screen
+        name="CameraCapture"
+        component={CameraScreen}
+      />
+      <Stack.Screen
+        name="SnapEditor"
+        component={SnapEditorScreen}
+        options={{
+          gestureEnabled: true,
+        }}
+      />
+    </Stack.Navigator>
+  );
+} 

@@ -2,7 +2,8 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, Platform } from 'react-native';
 import { ChatScreen } from '../screens/chat/ChatScreen';
-import { CameraScreen } from '../screens/camera/CameraScreen';
+import { CameraStackNavigator } from './CameraStackNavigator';
+import { FriendsStackNavigator } from './FriendsStackNavigator';
 import { StoriesScreen } from '../screens/stories/StoriesScreen';
 import { MainTabParamList } from '../types/navigation';
 
@@ -10,7 +11,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 /**
  * Main tab navigator for authenticated users.
- * Provides bottom tab navigation between Chat, Camera (center), and Stories.
+ * Provides bottom tab navigation between Chat, Camera (center), Friends, and Stories.
  * Follows SnapChat's core navigation pattern with Camera as the default screen.
  */
 export function MainTabNavigator() {
@@ -52,7 +53,7 @@ export function MainTabNavigator() {
       
       <Tab.Screen
         name="Camera"
-        component={CameraScreen}
+        component={CameraStackNavigator}
         options={{
           tabBarIcon: ({ focused }) => (
             <Text style={{ 
@@ -63,6 +64,22 @@ export function MainTabNavigator() {
             </Text>
           ),
           tabBarLabel: 'Camera',
+        }}
+      />
+
+      <Tab.Screen
+        name="Friends"
+        component={FriendsStackNavigator}
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <Text style={{ 
+              fontSize: 20, 
+              color: focused ? '#0084FF' : 'rgba(255, 255, 255, 0.6)' 
+            }}>
+              👥
+            </Text>
+          ),
+          tabBarLabel: 'Friends',
         }}
       />
       

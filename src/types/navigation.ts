@@ -10,9 +10,18 @@ export type AuthStackParamList = {
   ForgotPassword: undefined;
 };
 
+export type CameraStackParamList = {
+  CameraCapture: undefined;
+  SnapEditor: {
+    mediaUri: string;
+    mediaType: 'photo' | 'video';
+  };
+};
+
 export type MainTabParamList = {
   Chat: undefined;
   Camera: undefined;
+  Friends: undefined;
   Stories: undefined;
 };
 
