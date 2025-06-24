@@ -66,6 +66,32 @@ export interface Message {
   type: 'text' | 'snap';
 }
 
+export interface Story {
+  id: string;
+  userId: string;
+  snaps: StorySnap[];
+  createdAt: Timestamp;
+  expiresAt: Timestamp;
+  viewCount: number;
+  viewers: string[]; // userIds who have viewed
+}
+
+export interface StorySnap {
+  snapId: string;
+  storageUrl: string;
+  mediaType: 'photo' | 'video';
+  duration: number;
+  createdAt: Timestamp;
+}
+
+export interface StoryView {
+  id: string;
+  storyId: string;
+  viewerId: string;
+  viewedAt: Timestamp;
+  snapIndex: number; // which snap in the story was viewed
+}
+
 /**
  * Check if a username is available
  */
@@ -397,5 +423,266 @@ export async function getChat(chatId: string): Promise<Chat | null> {
   } catch (error) {
     console.error('Get chat error:', error);
     throw new Error('Failed to get chat');
+  }
+}
+
+/**
+ * Create a new story or add snap to existing story
+ */
+export async function createOrAddToStory(
+  userId: string,
+  snapData: {
+    storageUrl: string;
+    mediaType: 'photo' | 'video';
+    duration: number;
+  }
+): Promise<string> {
+  try {
+    // Check if user has an active story (within last 24 hours)
+    const now = Timestamp.now();
+    
+    const activeStoriesQuery = query(
+      collection(db, 'stories'),
+      where('userId', '==', userId),
+      where('expiresAt', '>', now),
+      limit(1)
+    );
+    
+    const activeStoriesSnapshot = await getDocs(activeStoriesQuery);
+    
+    const newSnap: StorySnap = {
+      snapId: `snap_${Date.now()}`,
+      storageUrl: snapData.storageUrl,
+      mediaType: snapData.mediaType,
+      duration: snapData.duration,
+      createdAt: Timestamp.now(),
+    };
+    
+    if (!activeStoriesSnapshot.empty) {
+      // Add to existing story
+      const storyDoc = activeStoriesSnapshot.docs[0];
+      const storyData = storyDoc.data() as Story;
+      
+      await updateDoc(storyDoc.ref, {
+        snaps: [...storyData.snaps, newSnap],
+      });
+      
+      return storyDoc.id;
+    } else {
+      // Create new story
+      const storyRef = doc(collection(db, 'stories'));
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      
+      await setDoc(storyRef, {
+        userId,
+        snaps: [newSnap],
+        createdAt: serverTimestamp(),
+        expiresAt: Timestamp.fromDate(expiresAt),
+        viewCount: 0,
+        viewers: [],
+      });
+      
+      return storyRef.id;
+    }
+  } catch (error) {
+    console.error('Create or add to story error:', error);
+    throw new Error('Failed to create or add to story');
+  }
+}
+
+/**
+ * Get all active stories from user's friends
+ */
+export async function getFriendsActiveStories(userId: string): Promise<(Story & { username: string })[]> {
+  try {
+    // First get user's friends
+    const friends = await getUserFriends(userId);
+    const friendIds = friends.map(friend => friend.uid);
+    
+    if (friendIds.length === 0) {
+      return [];
+    }
+    
+    // Get active stories from friends
+    const now = Timestamp.now();
+    const storiesQuery = query(
+      collection(db, 'stories'),
+      where('userId', 'in', friendIds),
+      where('expiresAt', '>', now),
+      orderBy('expiresAt', 'desc')
+    );
+    
+    const storiesSnapshot = await getDocs(storiesQuery);
+    const stories: (Story & { username: string })[] = [];
+    
+    for (const storyDoc of storiesSnapshot.docs) {
+      const storyData = { id: storyDoc.id, ...storyDoc.data() } as Story;
+      const friend = friends.find(f => f.uid === storyData.userId);
+      
+      if (friend) {
+        stories.push({
+          ...storyData,
+          username: friend.username,
+        });
+      }
+    }
+    
+    return stories;
+  } catch (error) {
+    console.error('Get friends active stories error:', error);
+    throw new Error('Failed to get friends active stories');
+  }
+}
+
+/**
+ * Get user's own active story
+ */
+export async function getUserActiveStory(userId: string): Promise<Story | null> {
+  try {
+    const now = Timestamp.now();
+    const storiesQuery = query(
+      collection(db, 'stories'),
+      where('userId', '==', userId),
+      where('expiresAt', '>', now),
+      limit(1)
+    );
+    
+    const storiesSnapshot = await getDocs(storiesQuery);
+    
+    if (storiesSnapshot.empty) {
+      return null;
+    }
+    
+    const storyDoc = storiesSnapshot.docs[0];
+    return { id: storyDoc.id, ...storyDoc.data() } as Story;
+  } catch (error) {
+    console.error('Get user active story error:', error);
+    throw new Error('Failed to get user active story');
+  }
+}
+
+/**
+ * Mark story as viewed by user
+ */
+export async function markStoryAsViewed(
+  storyId: string,
+  viewerId: string,
+  snapIndex: number
+): Promise<void> {
+  try {
+    // Check if user has already viewed this story
+    const existingViewQuery = query(
+      collection(db, 'story_views'),
+      where('storyId', '==', storyId),
+      where('viewerId', '==', viewerId),
+      limit(1)
+    );
+    
+    const existingViewSnapshot = await getDocs(existingViewQuery);
+    
+    if (existingViewSnapshot.empty) {
+      // Create new view record
+      const viewRef = doc(collection(db, 'story_views'));
+      await setDoc(viewRef, {
+        storyId,
+        viewerId,
+        viewedAt: serverTimestamp(),
+        snapIndex,
+      });
+      
+      // Update story viewer count
+      const storyRef = doc(db, 'stories', storyId);
+      const storyDoc = await getDoc(storyRef);
+      
+      if (storyDoc.exists()) {
+        const storyData = storyDoc.data() as Story;
+        await updateDoc(storyRef, {
+          viewCount: storyData.viewCount + 1,
+          viewers: [...storyData.viewers, viewerId],
+        });
+      }
+    } else {
+      // Update existing view record with latest snap index
+      const viewDoc = existingViewSnapshot.docs[0];
+      await updateDoc(viewDoc.ref, {
+        snapIndex,
+        viewedAt: serverTimestamp(),
+      });
+    }
+  } catch (error) {
+    console.error('Mark story as viewed error:', error);
+    throw new Error('Failed to mark story as viewed');
+  }
+}
+
+/**
+ * Get story viewers for analytics
+ */
+export async function getStoryViewers(storyId: string): Promise<(StoryView & { username: string })[]> {
+  try {
+    const viewsQuery = query(
+      collection(db, 'story_views'),
+      where('storyId', '==', storyId),
+      orderBy('viewedAt', 'desc')
+    );
+    
+    const viewsSnapshot = await getDocs(viewsQuery);
+    const viewers: (StoryView & { username: string })[] = [];
+    
+    for (const viewDoc of viewsSnapshot.docs) {
+      const viewData = { id: viewDoc.id, ...viewDoc.data() } as StoryView;
+      const userProfile = await getUserProfile(viewData.viewerId);
+      
+      if (userProfile) {
+        viewers.push({
+          ...viewData,
+          username: userProfile.username,
+        });
+      }
+    }
+    
+    return viewers;
+  } catch (error) {
+    console.error('Get story viewers error:', error);
+    throw new Error('Failed to get story viewers');
+  }
+}
+
+/**
+ * Delete expired stories (for cleanup)
+ */
+export async function deleteExpiredStories(): Promise<void> {
+  try {
+    const now = Timestamp.now();
+    const expiredStoriesQuery = query(
+      collection(db, 'stories'),
+      where('expiresAt', '<=', now)
+    );
+    
+    const expiredStoriesSnapshot = await getDocs(expiredStoriesQuery);
+    const batch = writeBatch(db);
+    
+    // Delete story documents
+    expiredStoriesSnapshot.docs.forEach(storyDoc => {
+      batch.delete(storyDoc.ref);
+    });
+    
+    // Delete associated story views
+    for (const storyDoc of expiredStoriesSnapshot.docs) {
+      const viewsQuery = query(
+        collection(db, 'story_views'),
+        where('storyId', '==', storyDoc.id)
+      );
+      
+      const viewsSnapshot = await getDocs(viewsQuery);
+      viewsSnapshot.docs.forEach(viewDoc => {
+        batch.delete(viewDoc.ref);
+      });
+    }
+    
+    await batch.commit();
+  } catch (error) {
+    console.error('Delete expired stories error:', error);
+    throw new Error('Failed to delete expired stories');
   }
 } 

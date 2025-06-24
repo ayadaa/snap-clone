@@ -8,6 +8,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { MainTabNavigator } from './MainTabNavigator';
 import { SnapViewerScreen } from '../screens/camera/SnapViewerScreen';
 import { IndividualChatScreen } from '../screens/chat/IndividualChatScreen';
+import StoryViewerScreen from '../screens/stories/StoryViewerScreen';
 import { AppStackParamList } from '../types/navigation';
 
 const Stack = createStackNavigator<AppStackParamList>();
@@ -43,6 +44,14 @@ export function AppStackNavigator() {
               },
             };
           },
+        }}
+      />
+      <Stack.Screen
+        name="StoryViewer"
+        component={StoryViewerScreen}
+        options={{
+          presentation: 'modal',
+          gestureEnabled: false, // Disable swipe gestures for story viewer
         }}
       />
       <Stack.Screen

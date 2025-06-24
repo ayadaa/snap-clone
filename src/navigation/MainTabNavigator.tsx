@@ -4,7 +4,7 @@ import { Text, Platform } from 'react-native';
 import { ChatScreen } from '../screens/chat/ChatScreen';
 import { CameraStackNavigator } from './CameraStackNavigator';
 import { FriendsStackNavigator } from './FriendsStackNavigator';
-import { StoriesScreen } from '../screens/stories/StoriesScreen';
+import StoriesScreen from '../screens/stories/StoriesScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
 import { MainTabParamList } from '../types/navigation';
 

@@ -1,3 +1,5 @@
+import type { NavigationProp as RNNavigationProp } from '@react-navigation/native';
+
 /**
  * Navigation parameter types for React Navigation.
  * Defines the structure of parameters passed between screens.
@@ -49,9 +51,26 @@ export type AppStackParamList = {
       isOnline: boolean;
     };
   };
+  StoryViewer: {
+    storyId: string;
+    stories: Array<{
+      id: string;
+      username: string;
+      snaps: Array<{
+        snapId: string;
+        storageUrl: string;
+        mediaType: 'photo' | 'video';
+        duration: number;
+      }>;
+    }>;
+    initialIndex: number;
+    isOwnStory?: boolean;
+  };
 };
 
 export type RootStackParamList = {
   Auth: undefined;
   Main: undefined;
-}; 
+};
+
+export type NavigationProp = RNNavigationProp<AppStackParamList>; 

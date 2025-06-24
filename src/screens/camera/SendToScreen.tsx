@@ -1,6 +1,6 @@
 /**
  * Send To Screen
- * Allows users to select friends to send their snap to
+ * Allows users to select friends to send their snap to or post to their story
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
@@ -16,12 +16,16 @@ import {
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
+import { useSelector } from 'react-redux';
 import { Screen } from '../../components/common/Screen';
 import { Button } from '../../components/common/Button';
 import { UserCard } from '../../components/friends/UserCard';
 import { useFriends } from '../../hooks/friends/use-friends';
 import { useSnaps } from '../../hooks/snaps/use-snaps';
+import { useStories } from '../../hooks/stories/use-stories';
+import { uploadSnap } from '../../services/firebase/storage.service';
 import { CameraStackParamList } from '../../types/navigation';
+import type { RootState } from '../../store';
 
 type SendToScreenRouteProp = RouteProp<CameraStackParamList, 'SendTo'>;
 type SendToScreenNavigationProp = StackNavigationProp<CameraStackParamList, 'SendTo'>;
@@ -29,19 +33,22 @@ type SendToScreenNavigationProp = StackNavigationProp<CameraStackParamList, 'Sen
 interface SendToScreenProps {}
 
 /**
- * Screen for selecting recipients for a snap
+ * Screen for selecting recipients for a snap or posting to story
  */
 export function SendToScreen({}: SendToScreenProps) {
   const navigation = useNavigation<SendToScreenNavigationProp>();
   const route = useRoute<SendToScreenRouteProp>();
+  const user = useSelector((state: RootState) => state.auth.user);
   
   const { mediaUri, mediaType, duration, hasText, hasDrawing } = route.params;
   
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
   const [isSending, setIsSending] = useState(false);
+  const [isPostingToStory, setIsPostingToStory] = useState(false);
   
   const { friends, isLoadingFriends: friendsLoading, friendsError } = useFriends();
   const { sendSnap, uploadProgress, error: snapError } = useSnaps();
+  const { addToStory, userStory } = useStories(user?.uid || '');
 
   /**
    * Toggle friend selection
@@ -55,6 +62,51 @@ export function SendToScreen({}: SendToScreenProps) {
       }
     });
   }, []);
+
+  /**
+   * Handle posting to story
+   */
+  const handlePostToStory = useCallback(async () => {
+    if (!user) return;
+
+    setIsPostingToStory(true);
+
+    try {
+      // Upload media to Firebase Storage
+      const uploadResult = await uploadSnap(mediaUri, user.uid, mediaType);
+      
+      // Add to story
+      const success = await addToStory({
+        storageUrl: uploadResult.downloadURL,
+        mediaType,
+        duration,
+      });
+
+      if (success) {
+        Alert.alert(
+          'Posted to Story!',
+          'Your snap has been added to your story.',
+          [
+            {
+              text: 'OK',
+              onPress: () => navigation.navigate('CameraCapture')
+            }
+          ]
+        );
+      } else {
+        throw new Error('Failed to post to story');
+      }
+    } catch (error) {
+      console.error('Error posting to story:', error);
+      Alert.alert(
+        'Post Failed',
+        'Failed to post to your story. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsPostingToStory(false);
+    }
+  }, [user, mediaUri, mediaType, duration, addToStory, navigation]);
 
   /**
    * Handle sending snap to selected friends
@@ -103,12 +155,12 @@ export function SendToScreen({}: SendToScreenProps) {
    * Handle back navigation
    */
   const handleBack = useCallback(() => {
-    if (isSending) {
+    if (isSending || isPostingToStory) {
       Alert.alert(
-        'Sending Snap',
-        'Your snap is currently being sent. Are you sure you want to cancel?',
+        'Processing',
+        'Your snap is currently being processed. Are you sure you want to cancel?',
         [
-          { text: 'Continue Sending', style: 'cancel' },
+          { text: 'Continue', style: 'cancel' },
           { 
             text: 'Cancel', 
             style: 'destructive',
@@ -119,7 +171,36 @@ export function SendToScreen({}: SendToScreenProps) {
     } else {
       navigation.goBack();
     }
-  }, [isSending, navigation]);
+  }, [isSending, isPostingToStory, navigation]);
+
+  /**
+   * Render My Story option
+   */
+  const renderMyStoryOption = () => (
+    <TouchableOpacity
+      onPress={handlePostToStory}
+      style={[styles.storyOption, (isSending || isPostingToStory) && styles.disabled]}
+      disabled={isSending || isPostingToStory}
+    >
+      <View style={styles.storyOptionContent}>
+        <View style={styles.storyIcon}>
+          <Ionicons name="add-circle" size={24} color="#3B82F6" />
+        </View>
+        <View style={styles.storyTextContainer}>
+          <Text style={styles.storyTitle}>My Story</Text>
+          <Text style={styles.storySubtitle}>
+            {userStory 
+              ? `Add to your story • ${userStory.viewCount} views`
+              : 'Share with all friends'
+            }
+          </Text>
+        </View>
+        {isPostingToStory && (
+          <ActivityIndicator size="small" color="#3B82F6" />
+        )}
+      </View>
+    </TouchableOpacity>
+  );
 
   /**
    * Render friend item with selection state
@@ -128,11 +209,11 @@ export function SendToScreen({}: SendToScreenProps) {
     const isSelected = selectedFriends.includes(friend.uid);
     
     return (
-              <TouchableOpacity
-          onPress={() => toggleFriendSelection(friend.uid)}
-          style={[styles.friendItem, isSending && styles.disabled]}
-          disabled={isSending}
-        >
+      <TouchableOpacity
+        onPress={() => toggleFriendSelection(friend.uid)}
+        style={[styles.friendItem, (isSending || isPostingToStory) && styles.disabled]}
+        disabled={isSending || isPostingToStory}
+      >
         <View style={styles.friendItemContent}>
           <UserCard
             user={friend}
@@ -155,7 +236,7 @@ export function SendToScreen({}: SendToScreenProps) {
         </View>
       </TouchableOpacity>
     );
-  }, [selectedFriends, toggleFriendSelection, isSending]);
+  }, [selectedFriends, toggleFriendSelection, isSending, isPostingToStory]);
 
   /**
    * Show error alert if there's an error
@@ -176,7 +257,7 @@ export function SendToScreen({}: SendToScreenProps) {
         <TouchableOpacity
           onPress={handleBack}
           style={styles.backButton}
-          disabled={isSending}
+          disabled={isSending || isPostingToStory}
         >
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
@@ -186,6 +267,16 @@ export function SendToScreen({}: SendToScreenProps) {
         </Text>
         
         <View style={styles.headerSpacer} />
+      </View>
+
+      {/* My Story Option */}
+      <View style={styles.storySection}>
+        {renderMyStoryOption()}
+      </View>
+
+      {/* Divider */}
+      <View style={styles.divider}>
+        <Text style={styles.dividerText}>Send to Friends</Text>
       </View>
 
       {/* Selected count */}
@@ -242,21 +333,21 @@ export function SendToScreen({}: SendToScreenProps) {
       {/* Send button */}
       {friends.length > 0 && (
         <View style={styles.sendButtonContainer}>
-                                  <Button
-              title={isSending 
-                ? "Sending..." 
-                : `Send to ${selectedFriends.length} friend${selectedFriends.length !== 1 ? 's' : ''}`
-              }
-              onPress={handleSendSnap}
-              disabled={selectedFriends.length === 0 || isSending}
-              loading={isSending}
-              style={{
-                ...styles.sendButton,
-                ...(selectedFriends.length > 0 && !isSending
-                  ? styles.sendButtonActive 
-                  : styles.sendButtonDisabled)
-              }}
-            />
+          <Button
+            title={isSending 
+              ? "Sending..." 
+              : `Send to ${selectedFriends.length} friend${selectedFriends.length !== 1 ? 's' : ''}`
+            }
+            onPress={handleSendSnap}
+            disabled={selectedFriends.length === 0 || isSending || isPostingToStory}
+            loading={isSending}
+            style={{
+              ...styles.sendButton,
+              ...(selectedFriends.length > 0 && !isSending && !isPostingToStory
+                ? styles.sendButtonActive 
+                : styles.sendButtonDisabled)
+            }}
+          />
         </View>
       )}
     </Screen>
@@ -388,5 +479,42 @@ const styles = StyleSheet.create({
   sendButtonDisabled: {
     backgroundColor: '#4B5563',
   },
-
+  storySection: {
+    padding: 16,
+  },
+  storyOption: {
+    padding: 16,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  storyOptionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  storyIcon: {
+    marginRight: 12,
+  },
+  storyTextContainer: {
+    flex: 1,
+  },
+  storyTitle: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  storySubtitle: {
+    color: '#9CA3AF',
+    fontSize: 14,
+  },
+  divider: {
+    padding: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  dividerText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '600',
+  },
 }); 
