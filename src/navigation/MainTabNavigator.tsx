@@ -12,10 +12,9 @@ import { MainTabParamList } from '../types/navigation';
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 /**
- * Main tab navigator for authenticated users.
- * Provides bottom tab navigation between Chat, Camera, Math, Friends, Stories, and Profile.
- * Follows SnapChat's core navigation pattern with Camera as the default screen.
- * Added Math tab for MathSnap RAG features.
+ * Main tab navigator for Snap Factor.
+ * Features bottom tabs for Chat, Camera, Stories, and Math.
+ * Added Math tab for Snap Factor RAG features.
  */
 export function MainTabNavigator() {
   return (

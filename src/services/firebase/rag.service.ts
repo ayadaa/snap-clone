@@ -1,12 +1,9 @@
 /**
- * @fileoverview RAG Service for MathSnap Frontend
+ * @fileoverview RAG Service for Snap Factor Frontend
  * 
- * This service handles communication with Firebase Cloud Functions
- * for RAG (Retrieval-Augmented Generation) features including:
- * - Math term definitions
- * - Concept exploration
- * - Homework help
- * - Image analysis
+ * This service provides the frontend interface for interacting with
+ * Snap Factor's RAG (Retrieval-Augmented Generation) Cloud Functions.
+ * It handles math explanations, definitions, concept exploration, and image analysis.
  */
 
 import { httpsCallable } from 'firebase/functions';

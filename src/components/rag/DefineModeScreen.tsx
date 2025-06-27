@@ -1,8 +1,8 @@
 /**
- * @fileoverview Define Mode Screen for MathSnap
+ * @fileoverview Define Mode Screen for Snap Factor
  * 
- * This component implements Story #2: "Define Mode"
- * Allows students to get instant definitions of math terms with citations
+ * This screen allows users to get instant definitions of math terms
+ * using the RAG system powered by OpenAI and math textbook data.
  * 
  * Features:
  * - Text input for math terms

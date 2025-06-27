@@ -1,4 +1,4 @@
-## **Project Requirements Document (PRD): "SnapClone"**
+## **Project Requirements Document (PRD): "Snap Factor"**
 
 **Version:** 1.0
 **Date:** June 23, 2025
@@ -8,13 +8,13 @@
 ### 1. Project Overview
 
 #### 1.1. Introduction
-This document outlines the requirements for "SnapClone," a mobile application that replicates the core functionality of Snapchat. The application will be developed for iOS (initially targeting an iPhone 16 Pro) using React Native and Expo. The backend infrastructure will be powered by Google's Firebase suite.
+This document outlines the requirements for "Snap Factor," a mobile application that combines social media functionality with AI-powered math learning. The application is built for iOS using React Native and Expo, with a Firebase backend infrastructure.
 
 #### 1.2. Project Goal
-The primary goal is to build a functional, real-time multimedia messaging application that allows users to share ephemeral photos and videos ("Snaps"), post 24-hour "Stories," and communicate through direct and group messages.
+The primary goal is to build a functional, real-time multimedia messaging application tailored for K-12 math students. Snap Factor allows users to share ephemeral photos and videos ("Snaps"), post 24-hour "Stories," communicate through direct and group messages, and receive AI-powered math assistance through RAG (Retrieval-Augmented Generation) technology.
 
 #### 1.3. Target Audience
-The primary target audience is young adults and teenagers (ages 13-25) who are familiar with social media platforms and value instant, visual, and temporary communication.
+The primary target audience is K-12 students (ages 10-18) who need help with math concepts and want to share their mathematical achievements in a social environment similar to Snapchat.
 
 ### 2. Technical Stack & Environment
 

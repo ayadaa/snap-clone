@@ -1,8 +1,8 @@
-# RAG-Powered "MathSnap" Brainstorming & Implementation Plan
+# RAG-Powered "Snap Factor" Brainstorming & Implementation Plan
 
-This document outlines the brainstorming and high-level implementation plan for integrating Retrieval-Augmented Generation (RAG) capabilities into the SnapClone application, pivoting it towards a K-12 math learning tool.
+This document outlines the brainstorming and high-level implementation plan for integrating Retrieval-Augmented Generation (RAG) capabilities into the Snap Factor application, focusing on K-12 math learning.
 
-### **RAG-Powered User Stories for "MathSnap"**
+### **RAG-Powered User Stories for "Snap Factor"**
 
 Here are six user stories that illustrate the power of RAG in this new context:
 

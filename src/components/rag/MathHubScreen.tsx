@@ -1,11 +1,8 @@
 /**
- * @fileoverview Math Hub Screen Component
+ * @fileoverview Math Hub Screen for Snap Factor
  * 
- * This component serves as the main entry point for all MathSnap features.
- * It provides navigation to:
- * - Define Mode (Story #2)
- * - Concept Explorer (Story #4)
- * - Future features (Homework Helper, Math Challenges, etc.)
+ * This component serves as the main entry point for all Snap Factor features.
+ * Provides navigation to Define Mode, Concept Explorer, Homework Helper, and Math Challenge.
  */
 
 import * as React from 'react';
@@ -80,7 +77,7 @@ export const MathHubScreen: React.FC = () => {
    */
   const handleFeaturePress = (feature: typeof MATH_FEATURES[0]) => {
     if (feature.available) {
-      navigation.navigate(feature.route);
+      navigation.navigate(feature.route as any);
     }
   };
 
@@ -121,7 +118,7 @@ export const MathHubScreen: React.FC = () => {
       <ScrollView style={styles.scrollContainer}>
         {/* Header */}
         <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-          <Text style={styles.title}>🧮 MathSnap Hub</Text>
+          <Text style={styles.title}>🧮 Snap Factor Hub</Text>
           <Text style={styles.subtitle}>
             Your AI-powered math learning companion
           </Text>

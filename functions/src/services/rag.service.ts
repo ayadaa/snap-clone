@@ -1,12 +1,10 @@
 /**
- * @fileoverview RAG (Retrieval-Augmented Generation) service for MathSnap
+ * @fileoverview RAG (Retrieval-Augmented Generation) service for Snap Factor
  * 
- * This service handles the core RAG pipeline:
- * 1. Receives user queries (text or image)
- * 2. Creates embeddings for the query
- * 3. Retrieves relevant content from Pinecone vector database
- * 4. Generates AI responses using OpenAI GPT-4
- * 5. Returns formatted explanations with citations
+ * This service handles the core RAG functionality including:
+ * - OpenAI API interactions for embeddings and completions
+ * - Pinecone vector database queries for relevant content retrieval
+ * - Math textbook content processing and analysis
  */
 
 import { Pinecone } from '@pinecone-database/pinecone';

@@ -6,14 +6,10 @@ import { store } from './src/store';
 import { AppNavigator } from './src/navigation/AppNavigator';
 
 /**
- * Main App component for SnapClone.
- * Phase 0 implementation with Redux store integration and navigation setup.
+ * Main App component for Snap Factor.
  * 
- * Features:
- * - Redux store provider for state management
- * - Navigation between auth and main app flows
- * - Basic UI component library
- * - Dark theme design system
+ * Handles app initialization, navigation setup, and global state management.
+ * Provides authentication flow and main app navigation structure.
  */
 export default function App() {
   return (

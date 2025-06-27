@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "temp-expo",
-    "slug": "temp-expo",
+    "name": "Snap Factor",
+    "slug": "snap-factor",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -15,8 +15,8 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "This app needs access to the camera to take photos and videos for snaps.",
-        "NSMicrophoneUsageDescription": "This app needs access to the microphone to record videos with audio."
+        "NSCameraUsageDescription": "Snap Factor needs access to the camera to take photos and videos for math snaps.",
+        "NSMicrophoneUsageDescription": "Snap Factor needs access to the microphone to record videos with audio."
       }
     },
     "android": {

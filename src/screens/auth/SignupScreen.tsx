@@ -38,7 +38,7 @@ export function SignupScreen() {
                 marginBottom: 8,
               }}
             >
-              Join SnapClone
+              Join Snap Factor
             </Text>
             <Text
               style={{

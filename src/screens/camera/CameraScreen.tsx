@@ -10,9 +10,9 @@ import { useCamera } from '../../hooks/camera/use-camera';
 import { Ionicons } from '@expo/vector-icons';
 
 /**
- * Camera screen component - the heart of SnapClone.
- * Features full camera functionality with photo/video capture,
- * camera controls, and navigation to snap editing.
+ * Camera screen component - the heart of Snap Factor.
+ * Provides camera functionality with capture, filters, and navigation.
+ * Handles permissions, camera setup, and media capture workflows.
  */
 type CameraScreenNavigationProp = StackNavigationProp<CameraStackParamList, 'CameraCapture'>;
 
@@ -56,7 +56,7 @@ export function CameraScreen() {
       if (!permissions.camera) {
         Alert.alert(
           'Camera Permission Required',
-          'Please enable camera access in your device settings to use SnapClone.',
+          'Please enable camera access in your device settings to use Snap Factor.',
           [{ text: 'OK' }]
         );
       }
@@ -168,7 +168,7 @@ export function CameraScreen() {
         <View style={styles.permissionContainer}>
           <Text style={styles.permissionTitle}>Camera Access Required</Text>
           <Text style={styles.permissionText}>
-            Please enable camera access in your device settings to use SnapClone.
+            Please enable camera access in your device settings to use Snap Factor.
           </Text>
         </View>
       </Screen>

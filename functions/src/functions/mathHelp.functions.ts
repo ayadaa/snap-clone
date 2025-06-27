@@ -1,11 +1,13 @@
 /**
- * @fileoverview Callable Cloud Functions for MathSnap RAG features
+ * @fileoverview Callable Cloud Functions for Snap Factor RAG features
  * 
- * These functions provide the main API endpoints that the frontend app will call:
- * 1. getMathExplanation - Process text queries for math help
+ * This file contains all the callable functions for Snap Factor's math learning features:
+ * 1. getMathExplanation - Get explanations for math concepts and problems
  * 2. analyzeMathSnap - Process image Snaps for math problem analysis
  * 3. getDefinition - Get definitions for math terms
- * 4. exploreConcept - Explore mathematical concepts in depth
+ * 4. exploreConcept - Deep dive into mathematical concepts
+ * 5. generateSmartCaption - Generate AI captions for math snaps
+ * 6. checkRagHealth - Health check for RAG system
  */
 
 import * as functions from 'firebase-functions';

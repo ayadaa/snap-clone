@@ -1,10 +1,8 @@
 /**
- * @fileoverview This is the main entry point for all Firebase Cloud Functions
- * for the SnapClone RAG project.
- *
- * This file initializes the Firebase Admin SDK and exports all the callable
- * functions that the frontend application will interact with for MathSnap
- * RAG features.
+ * @fileoverview Firebase Cloud Functions entry point for Snap Factor RAG project.
+ * 
+ * This file exports all Cloud Functions that the frontend application will 
+ * interact with for Snap Factor's math learning features.
  */
 
 import * as admin from "firebase-admin";

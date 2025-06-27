@@ -1,11 +1,8 @@
 /**
- * @fileoverview Math Stack Navigator for MathSnap RAG Features
+ * @fileoverview Math Stack Navigator for Snap Factor RAG Features
  * 
- * This navigator handles all math-related screens including:
- * - Define Mode (Story #2)
- * - Concept Explorer (Story #4) 
- * - Homework Helper (Story #1)
- * - Math Challenge features (Stories #5-6)
+ * This navigator handles all the math-related screens including
+ * Math Hub, Define Mode, Concept Explorer, and Challenge features.
  */
 
 import React from 'react';

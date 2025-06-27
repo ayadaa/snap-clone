@@ -109,7 +109,7 @@ export function ProfileScreen() {
 
         {/* App Info */}
         <View style={styles.appInfo}>
-          <Text style={styles.appInfoText}>SnapClone v1.0</Text>
+          <Text style={styles.appInfoText}>Snap Factor v1.0</Text>
           <Text style={styles.appInfoText}>Built with React Native & Firebase</Text>
         </View>
       </ScrollView>

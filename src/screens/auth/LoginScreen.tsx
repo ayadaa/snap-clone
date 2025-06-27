@@ -39,7 +39,7 @@ export function LoginScreen() {
               marginBottom: 8,
             }}
           >
-            SnapClone
+            Snap Factor
           </Text>
           <Text
             style={{

@@ -1,8 +1,8 @@
-# **Tech Stack Document: SnapClone**
+# **Tech Stack Document: Snap Factor**
 
 **Version:** 1.0  
 **Date:** January 2025  
-**Project:** SnapClone Mobile Application
+**Project:** Snap Factor Mobile Application
 
 ---
 
@@ -397,7 +397,7 @@ const screenOptions = {
 
 // 4. Use proper deep linking
 const linking = {
-  prefixes: ['snapclone://'],
+  prefixes: ['snapfactor://'],
   config: {
     screens: {
       Chat: 'chat/:chatId',
