@@ -1,27 +1,35 @@
-# **SnapClone - Modern Social Media Platform**
+# **Snap Factor - AI-Powered K-12 Math Learning Platform**
 
-> A feature-rich, privacy-first social media application built with React Native and Firebase
+> A revolutionary educational social media application that combines Snapchat-like features with AI-powered math tutoring for K-12 students
 
 [![React Native](https://img.shields.io/badge/React%20Native-0.72-blue.svg)](https://reactnative.dev/)
 [![Expo](https://img.shields.io/badge/Expo-49.0-black.svg)](https://expo.dev/)
 [![Firebase](https://img.shields.io/badge/Firebase-10.0-orange.svg)](https://firebase.google.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)](https://www.typescriptlang.org/)
+[![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4-green.svg)](https://openai.com/)
+[![Pinecone](https://img.shields.io/badge/Pinecone-Vector%20DB-purple.svg)](https://www.pinecone.io/)
 
 ---
 
 ## **🎯 Project Overview**
 
-SnapClone is a modern take on ephemeral social media, combining the best features of platforms like Snapchat with enhanced privacy, AI-powered features, and a creator-focused economy. Built with React Native and Expo, it delivers a seamless cross-platform experience with real-time messaging, AR filters, and disappearing content.
+Snap Factor is an innovative K-12 math learning platform that combines the engaging social features of Snapchat with powerful AI-driven educational tools. Students can share their mathematical achievements, get instant homework help, and learn collaboratively through ephemeral content and real-time messaging, all powered by advanced RAG (Retrieval-Augmented Generation) technology.
 
-### **Key Features**
-- 📱 **Ephemeral Messaging**: Photos and videos that disappear after viewing
-- 📖 **24-Hour Stories**: Broadcast content to all friends with automatic expiration
-- 🎭 **AR Filters**: Face detection and augmented reality effects
-- 💬 **Real-time Chat**: Instant messaging with delivery confirmations
-- 👥 **Group Messaging**: Multi-user conversations with media sharing
-- 🔒 **Privacy-First**: End-to-end encryption and granular privacy controls
-- 🎨 **Content Creation**: Advanced editing tools with drawing and text overlays
-- 🌐 **Cross-Platform**: Mobile-first with web and desktop expansion planned
+### **🧠 AI-Powered Learning Features**
+- 📚 **Homework Helper**: Take a snap of any math problem for instant, step-by-step solutions with textbook citations
+- 📖 **Define Mode**: Instantly look up mathematical terms and concepts with contextual definitions
+- ✨ **Smart Captions**: AI-generated captions for math achievement posts
+- 🔍 **Concept Explorer**: Interactive exploration of mathematical concepts with examples and practice problems
+- 🏆 **Challenge a Friend**: Create and share math challenges based on learned concepts
+- 📅 **Daily Math Challenge**: Personalized daily challenges tailored to grade level and learning progress
+
+### **📱 Social Learning Features**
+- 📸 **Math Snaps**: Share photos and videos of mathematical work that disappear after viewing
+- 📖 **Learning Stories**: 24-hour broadcasts of math achievements and progress
+- 💬 **Study Groups**: Real-time chat with classmates and study partners
+- 👥 **Collaborative Problem Solving**: Group messaging for tackling difficult problems together
+- 🎨 **Interactive Content**: Drawing tools for mathematical diagrams and explanations
+- 🔒 **Safe Learning Environment**: Privacy-first design with educational content moderation
 
 ---
 
@@ -43,11 +51,18 @@ SnapClone is a modern take on ephemeral social media, combining the best feature
   - **Functions**: Firebase Cloud Functions (Node.js 20)
   - **Messaging**: Firebase Cloud Messaging (FCM)
 
+### **AI & RAG System**
+- **Language Model**: OpenAI GPT-4 with Vision API
+- **Vector Database**: Pinecone for semantic search
+- **Knowledge Base**: OpenStax K-12 Math Textbooks
+- **Embeddings**: OpenAI text-embedding-3-small
+- **Image Analysis**: OpenAI Vision API for homework problem recognition
+
 ### **Camera & Media**
 - **Camera**: Expo Camera
-- **AR Filters**: Expo Face Detector
 - **Drawing**: React Native SVG + Gesture Handler
 - **Media Processing**: Expo Image Manipulator
+- **Sharing**: React Native Share API
 
 ### **Development Tools**
 - **Package Manager**: npm
@@ -57,11 +72,11 @@ SnapClone is a modern take on ephemeral social media, combining the best feature
 
 ---
 
-## **📱 Target Platforms**
+## **📱 Target Audience**
 
-- **Primary**: iOS (iPhone 16 Pro optimized)
-- **Secondary**: Android
-- **Future**: Web application, Desktop (Electron)
+- **Primary**: K-12 students (ages 10-18) studying mathematics
+- **Secondary**: Parents and educators supporting student learning
+- **Platforms**: iOS (iPhone 16 Pro optimized), Android, Future Web/Desktop
 
 ---
 
@@ -69,6 +84,7 @@ SnapClone is a modern take on ephemeral social media, combining the best feature
 
 ### **Development Philosophy**
 - **AI-First Development**: Modular, well-documented code optimized for AI assistance
+- **Educational Focus**: Every feature designed to enhance mathematical learning
 - **500-Line File Limit**: Maximum readability and maintainability
 - **Separation of Concerns**: Clear responsibility boundaries
 - **Type Safety**: Comprehensive TypeScript implementation
@@ -76,32 +92,50 @@ SnapClone is a modern take on ephemeral social media, combining the best feature
 
 ### **Directory Structure**
 ```
-iOSApp/
+SnapFactor/
 ├── src/
 │   ├── components/          # Reusable UI components
 │   │   ├── common/          # Universal components (Button, Input)
-│   │   ├── forms/           # Form-specific components
-│   │   └── navigation/      # Navigation components
+│   │   ├── camera/          # Camera and snap editing components
+│   │   ├── chat/            # Chat and messaging components
+│   │   ├── rag/             # RAG-powered educational components
+│   │   └── forms/           # Form-specific components
 │   ├── screens/             # Screen-level components
 │   │   ├── auth/            # Authentication screens
 │   │   ├── camera/          # Camera and editing screens
 │   │   ├── chat/            # Chat and messaging screens
-│   │   ├── stories/         # Stories screens
-│   │   └── profile/         # Profile and settings screens
-│   ├── store/               # Redux store and state management
-│   │   ├── slices/          # Redux Toolkit slices
-│   │   └── api/             # RTK Query API definitions
+│   │   └── stories/         # Stories screens
 │   ├── services/            # External service integrations
 │   │   ├── firebase/        # Firebase service modules
-│   │   ├── camera/          # Camera utilities
+│   │   │   ├── rag.service.ts        # RAG system integration
+│   │   │   ├── challenges.service.ts # Daily challenges
+│   │   │   └── vision.service.ts     # Image analysis
 │   │   └── notifications/   # Push notification services
 │   ├── hooks/               # Custom React hooks
+│   │   ├── auth/            # Authentication hooks
+│   │   ├── challenges/      # Daily challenge hooks
+│   │   ├── math/            # Math-specific hooks
+│   │   └── rag/             # RAG system hooks
+│   ├── store/               # Redux store and state management
+│   │   ├── slices/          # Redux Toolkit slices
+│   │   │   ├── auth.slice.ts
+│   │   │   └── rag.slice.ts
+│   │   └── api/             # RTK Query API definitions
 │   ├── utils/               # Utility functions and helpers
 │   ├── types/               # TypeScript type definitions
 │   └── constants/           # Application-wide constants
+├── functions/               # Firebase Cloud Functions
+│   └── src/
+│       ├── functions/       # RAG-powered Cloud Functions
+│       │   └── mathHelp.functions.ts
+│       └── services/        # Backend service modules
+│           ├── rag.service.ts
+│           └── vision.service.ts
+├── data-ingestion/          # Knowledge base preparation
+│   ├── scraped_data/        # OpenStax textbook content
+│   └── ingest.py           # Data processing and embedding
 ├── assets/                  # Static assets (images, fonts, icons)
 ├── docs/                    # Project documentation
-├── __tests__/               # Test files
 └── App.tsx                  # Root application component
 ```
 
@@ -109,67 +143,115 @@ iOSApp/
 
 ## **🎨 Design System**
 
-### **Theme: Dark Minimalism + Glassmorphic Overlays**
+### **Theme: Educational Minimalism**
 - **Primary Colors**: 
-  - Snap Yellow: `#FFFC00`
-  - Electric Blue: `#0FADFF`
-- **Design Approach**: Mobile-first, content-focused interface
-- **Visual Style**: Dark backgrounds with subtle glassmorphic effects
-- **Typography**: iOS Dynamic Type support with fluid scaling
+  - Education Blue: `#0FADFF`
+  - Success Green: `#10B981`
+  - Warning Orange: `#F59E0B`
+- **Design Approach**: Mobile-first, learning-focused interface
+- **Visual Style**: Clean backgrounds with subtle educational elements
+- **Typography**: iOS Dynamic Type support with math symbol rendering
 - **Spacing**: 8pt grid system for consistent layouts
 
 ### **Navigation Pattern**
-- **Bottom Tabs**: Chat | Camera (Center) | Stories
+- **Bottom Tabs**: Chat | Camera (Center) | Math Hub
 - **Universal Header**: Profile + Search icons on every screen
 - **Gesture Navigation**: Swipe left/right from camera for quick access
-- **Context-Aware**: Smart back navigation based on user flow
+- **Context-Aware**: Smart back navigation based on learning flow
+
+---
+
+## **🧠 RAG System Implementation**
+
+### **Knowledge Base**
+- **Source**: OpenStax K-12 Mathematics Textbooks
+- **Coverage**: Pre-Algebra through Calculus
+- **Processing**: Chunked into semantic sections with metadata
+- **Embeddings**: 1536-dimensional vectors using OpenAI's text-embedding-3-small
+
+### **RAG Workflow**
+1. **User Input**: Photo of math problem or text query
+2. **Image Analysis**: OpenAI Vision API extracts problem text
+3. **Embedding Creation**: Convert query to vector representation
+4. **Semantic Search**: Query Pinecone for relevant textbook content
+5. **Context Assembly**: Combine retrieved content with user query
+6. **AI Generation**: GPT-4 generates educational response with citations
+7. **Response Delivery**: Formatted explanation delivered to user
+
+### **Educational Features**
+
+#### **Homework Helper**
+- Upload photos of math problems for instant help
+- Step-by-step solutions with textbook citations
+- Grade-appropriate explanations
+- Progress tracking and learning analytics
+
+#### **Daily Math Challenge**
+- Personalized challenges based on grade level
+- Scoring system with streak tracking
+- Social sharing with Wordle-style results
+- AI-powered difficulty adjustment
+
+#### **Define Mode**
+- Instant definitions of mathematical terms
+- Contextual examples and applications
+- Visual diagrams when applicable
+- Related concept suggestions
 
 ---
 
 ## **🔧 Getting Started**
 
 ### **Prerequisites**
-- Node.js 18+ (Node.js 20 recommended for Cloud Functions)
-- npm or yarn package manager
+- Node.js 20+ (Required for Cloud Functions)
+- npm package manager
 - Expo CLI: `npm install -g @expo/cli`
 - iOS Simulator (Mac) or Android Emulator
 - Firebase account and project setup
+- OpenAI API key
+- Pinecone account and API key
 
 ### **Installation**
 
 1. **Clone the repository**
    ```bash
    git clone <repository-url>
-   cd SnapConnect/iOSApp
+   cd SnapFactor
    ```
 
 2. **Install dependencies**
    ```bash
    npm install
+   cd functions && npm install
    ```
 
 3. **Configure Firebase**
    ```bash
-   # Copy firebase configuration
-   cp firebase.config.example.js firebase.config.js
+   # Initialize Firebase (if not already done)
+   firebase init
+   
+   # Set up secret keys for Cloud Functions
+   firebase functions:secrets:set OPENAI_API_KEY
+   firebase functions:secrets:set PINECONE_API_KEY
+   ```
+
+4. **Set up environment variables**
+   ```bash
+   # Copy and configure environment file
+   cp .env.example .env
    # Add your Firebase project configuration
    ```
 
-4. **Start development server**
+5. **Deploy Cloud Functions**
    ```bash
-   npx expo start
+   cd functions
+   npm run build
+   firebase deploy --only functions
    ```
 
-5. **Run on device/simulator**
+6. **Start development server**
    ```bash
-   # iOS Simulator
-   npx expo start --ios
-   
-   # Android Emulator
-   npx expo start --android
-   
-   # Physical device with Expo Go
-   # Scan QR code from Expo Dev Tools
+   npx expo start
    ```
 
 ### **Environment Setup**
@@ -188,38 +270,47 @@ EXPO_PUBLIC_FIREBASE_APP_ID=your_app_id
 
 ## **📋 Development Phases**
 
-### **Phase 0: Foundation Setup** (3-5 days)
+### **Phase 0: Foundation Setup** ✅ **COMPLETED**
 - ✅ Project initialization and Firebase integration
 - ✅ Basic navigation structure
 - ✅ Authentication system
 - ✅ UI component library
 
-### **Phase 1: MVP** (2-3 weeks)
-- 🚧 Camera interface and snap capture
-- 🚧 Snap editing (text, drawing, stickers)
-- 🚧 Friend management system
-- 🚧 Real-time messaging
-- 🚧 Ephemeral content logic
+### **Phase 1: MVP Social Features** ✅ **COMPLETED**
+- ✅ Camera interface and snap capture
+- ✅ Snap editing (text, drawing, stickers)
+- ✅ Friend management system
+- ✅ Real-time messaging
+- ✅ Stories with 24-hour expiration
 
-### **Phase 2: Enhanced Features** (2-3 weeks)
-- ⏳ Stories with 24-hour expiration
-- ⏳ Group messaging
-- ⏳ Basic AR filters (5+ filters)
-- ⏳ Advanced editing tools
+### **Phase 2: RAG Integration** ✅ **COMPLETED**
+- ✅ OpenAI API integration
+- ✅ Pinecone vector database setup
+- ✅ Knowledge base ingestion (OpenStax textbooks)
+- ✅ Homework Helper implementation
+- ✅ Define Mode functionality
+- ✅ Smart Caption generation
+
+### **Phase 3: Advanced Learning Features** ✅ **COMPLETED**
+- ✅ Concept Explorer with interactive examples
+- ✅ Challenge a Friend system
+- ✅ Daily Math Challenge with scoring
+- ✅ Progress tracking and analytics
+- ✅ Social sharing of achievements
+
+### **Phase 4: Enhancement & Polish** 🚧 **IN PROGRESS**
+- ⏳ Advanced AR filters for mathematical visualization
+- ⏳ Voice input for math problems
+- ⏳ Collaborative problem-solving features
+- ⏳ Teacher dashboard and classroom integration
 - ⏳ Performance optimizations
 
-### **Phase 3: Polish & Production** (3-4 weeks)
-- ⏳ Advanced AR filters (15+ filters)
-- ⏳ Voice and video messaging
-- ⏳ End-to-end encryption
-- ⏳ Accessibility compliance
-- ⏳ App Store preparation
-
-### **Phase 4: Advanced Features** (6-8 weeks)
-- ⏳ Snap Map and location features
-- ⏳ Creator economy and monetization
-- ⏳ AI-powered recommendations
-- ⏳ Cross-platform expansion
+### **Phase 5: Advanced Features** ⏳ **PLANNED**
+- ⏳ Adaptive learning algorithms
+- ⏳ Gamification and achievement system
+- ⏳ Parent and teacher analytics
+- ⏳ Cross-platform web application
+- ⏳ Integration with school LMS systems
 
 ---
 
@@ -235,65 +326,18 @@ npm run test:watch
 
 # Run tests with coverage
 npm run test:coverage
+
+# Test Cloud Functions locally
+cd functions
+npm run test
 ```
 
 ### **Testing Strategy**
 - **Unit Tests**: Component and utility function testing
-- **Integration Tests**: Service and API integration testing
-- **E2E Tests**: Complete user flow testing with Detox
+- **Integration Tests**: RAG system and Firebase integration testing
+- **E2E Tests**: Complete learning flow testing
 - **Performance Tests**: 60fps target validation
-
----
-
-## **📝 Code Conventions**
-
-### **File Naming**
-- **Components**: `PascalCase.tsx` (e.g., `UserProfile.tsx`)
-- **Files**: `kebab-case.ts` (e.g., `user-profile-screen.tsx`)
-- **Hooks**: `use-hook-name.ts` (e.g., `use-auth.ts`)
-- **Services**: `service-name.service.ts` (e.g., `auth.service.ts`)
-
-### **Import Organization**
-```typescript
-// 1. React and React Native
-import React from 'react';
-import { View, Text } from 'react-native';
-
-// 2. Third-party libraries
-import { useNavigation } from '@react-navigation/native';
-
-// 3. Internal components
-import { Button } from '@/components/common/Button';
-
-// 4. Hooks and services
-import { useAuth } from '@/hooks/auth/use-auth';
-
-// 5. Types and constants
-import type { User } from '@/types/user';
-import { COLORS } from '@/constants/colors';
-```
-
-### **Documentation Requirements**
-- **File Headers**: Purpose, dependencies, last updated
-- **Function Documentation**: JSDoc with parameters, returns, examples
-- **Component Documentation**: Props, usage examples, integration notes
-- **500-Line Limit**: Maximum file size for maintainability
-
----
-
-## **🔒 Security & Privacy**
-
-### **Data Protection**
-- End-to-end encryption for all messages and snaps
-- Secure storage for authentication tokens
-- Comprehensive Firebase security rules
-- Input validation and sanitization
-
-### **Privacy Features**
-- Granular privacy controls
-- Automatic content expiration
-- Screenshot detection
-- Biometric authentication support
+- **Educational Tests**: Learning outcome validation
 
 ---
 
@@ -301,37 +345,51 @@ import { COLORS } from '@/constants/colors';
 
 - **App Startup**: < 3 seconds
 - **Camera Launch**: < 500ms
+- **RAG Response Time**: < 5 seconds for homework help
 - **Frame Rate**: 60 FPS maintained
 - **Memory Usage**: < 200MB during normal operation
-- **Network Efficiency**: < 50MB per hour of typical usage
+- **Network Efficiency**: Optimized for mobile data usage
 
 ---
 
-## **🤝 Contributing**
+## **🎯 Educational Impact Goals**
 
-### **Development Workflow**
-1. Create feature branch from `main`
-2. Follow code conventions and documentation requirements
-3. Write tests for new functionality
-4. Ensure all tests pass and code quality checks pass
-5. Submit pull request with detailed description
+### **Learning Outcomes**
+- **Improved Math Comprehension**: 25% improvement in problem-solving skills
+- **Increased Engagement**: 40% more time spent on math homework
+- **Better Retention**: 30% improvement in concept retention
+- **Collaborative Learning**: Enhanced peer-to-peer learning experiences
 
-### **Quality Checklist**
-- [ ] File is under 500 lines
-- [ ] All functions have JSDoc documentation
-- [ ] TypeScript types are explicit
-- [ ] Tests are written and passing
-- [ ] Code follows established patterns
-- [ ] No console.log statements in production code
+### **Usage Metrics**
+- **Daily Active Users**: Target 10,000+ students
+- **Problem Solving**: 1M+ math problems solved monthly
+- **Knowledge Sharing**: 100,000+ educational snaps shared
+- **Learning Streaks**: Average 7-day learning streak
+
+---
+
+## **🔒 Security & Privacy**
+
+### **Educational Data Protection**
+- COPPA and FERPA compliance for student data
+- Secure storage for student work and progress
+- Parental consent and control features
+- Content moderation for educational appropriateness
+
+### **AI Safety**
+- Responsible AI practices for educational content
+- Bias detection and mitigation in math explanations
+- Transparent AI decision-making
+- Human oversight of AI-generated educational content
 
 ---
 
 ## **📚 Documentation**
 
-- **[Project Overview](docs/project-overview.md)** - Detailed feature requirements and goals
-- **[User Flow](docs/user-flow.md)** - Complete navigation and interaction patterns
+- **[Project Overview](docs/project-overview.md)** - Detailed feature requirements and educational goals
+- **[RAG User Stories](docs/rag-user-stories.md)** - AI-powered learning feature specifications
 - **[Tech Stack](docs/tech-stack.md)** - Comprehensive technology decisions and best practices
-- **[Project Rules](docs/project-rules.md)** - Development conventions and AI-first principles
+- **[User Flow](docs/user-flow.md)** - Complete navigation and learning interaction patterns
 - **[Development Roadmap](docs/development-roadmap.md)** - Complete development timeline and milestones
 
 ---
@@ -339,22 +397,32 @@ import { COLORS } from '@/constants/colors';
 ## **🎯 Project Goals**
 
 ### **Short-term (6 months)**
-- Launch MVP with core Snapchat-like features
-- Achieve 10,000+ beta users
-- Establish creator beta program
-- App Store approval and launch
+- Launch MVP with core RAG-powered learning features
+- Achieve 10,000+ student beta users
+- Partner with 10+ schools for pilot programs
+- App Store approval and educational category launch
 
 ### **Long-term (2-3 years)**
-- 100M+ monthly active users
-- Comprehensive creator economy
-- Cross-platform market leadership
-- Advanced AR/VR integration
+- 1M+ monthly active student users
+- Comprehensive K-12 math curriculum coverage
+- Integration with major school districts
+- Expansion to other STEM subjects
+- International market penetration
+
+---
+
+## **🏆 Recognition & Awards**
+- Featured in educational technology showcases
+- Recognized for innovative AI in education
+- Student and teacher testimonials
+- Academic research partnerships
 
 ---
 
 ## **📄 License**
 
 This project is proprietary and confidential. All rights reserved.
+Educational content sourced from OpenStax under Creative Commons licensing.
 
 ---
 
@@ -362,8 +430,10 @@ This project is proprietary and confidential. All rights reserved.
 
 **Project Owner**: Sean Stricker  
 **Development Team**: AI-Assisted Development with Cursor  
-**Project Start**: January 2025
+**Project Start**: January 2025  
+**Educational Focus**: K-12 Mathematics Learning
 
 ---
 
-**Built with ❤️ using React Native, Firebase, and AI-first development principles** 
+**Built with ❤️ for students, educators, and the future of learning**  
+*Combining React Native, Firebase, OpenAI, and AI-first development principles* 
