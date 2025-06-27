@@ -64,9 +64,10 @@ export interface Message {
   senderId: string;
   text?: string;
   snapId?: string;
+  challengeSnapId?: string;
   timestamp: Timestamp;
   status: 'sent' | 'delivered' | 'read';
-  type: 'text' | 'snap';
+  type: 'text' | 'snap' | 'challenge';
 }
 
 export interface Story {
@@ -1188,5 +1189,267 @@ export async function markSnapAsViewed(snapId: string, viewerId: string): Promis
   } catch (error) {
     console.error('Mark snap as viewed error:', error);
     throw new Error('Failed to mark snap as viewed');
+  }
+}
+
+/**
+ * Math Challenge related functions
+ */
+
+/**
+ * Interface for math challenge data
+ */
+export interface MathChallenge {
+  id: string;
+  problem: string;
+  concept: string;
+  gradeLevel: string;
+  solution?: string;
+  correctAnswer?: string;
+  explanation?: string;
+  createdBy: string;
+  createdAt: Timestamp;
+  difficulty: 'basic' | 'intermediate' | 'advanced';
+  timeLimit?: number;
+}
+
+/**
+ * Interface for challenge snap data
+ */
+export interface ChallengeSnap {
+  id: string;
+  challengeId: string;
+  senderId: string;
+  recipientId: string;
+  status: 'sent' | 'viewed' | 'answered' | 'expired';
+  sentAt: Timestamp;
+  viewedAt?: Timestamp;
+  answeredAt?: Timestamp;
+  recipientAnswer?: string;
+  isCorrect?: boolean;
+  expiresAt: Timestamp;
+}
+
+/**
+ * Create a new math challenge
+ */
+export async function createMathChallenge(challengeData: {
+  problem: string;
+  concept: string;
+  gradeLevel: string;
+  solution?: string;
+  correctAnswer?: string;
+  explanation?: string;
+  createdBy: string;
+  difficulty: 'basic' | 'intermediate' | 'advanced';
+  timeLimit?: number;
+}): Promise<string> {
+  try {
+    const challengeRef = doc(collection(db, 'mathChallenges'));
+    const challenge: Omit<MathChallenge, 'id'> = {
+      ...challengeData,
+      createdAt: serverTimestamp() as Timestamp,
+    };
+    
+    await setDoc(challengeRef, challenge);
+    return challengeRef.id;
+  } catch (error) {
+    console.error('Error creating math challenge:', error);
+    throw new Error('Failed to create math challenge');
+  }
+}
+
+/**
+ * Send a challenge snap to a friend
+ */
+export async function sendChallengeSnap(
+  challengeId: string,
+  senderId: string,
+  recipientId: string,
+  chatId?: string
+): Promise<string> {
+  try {
+    const challengeSnapRef = doc(collection(db, 'challengeSnaps'));
+    const challengeSnap: Omit<ChallengeSnap, 'id'> = {
+      challengeId,
+      senderId,
+      recipientId,
+      status: 'sent',
+      sentAt: serverTimestamp() as Timestamp,
+      expiresAt: Timestamp.fromDate(new Date(Date.now() + 24 * 60 * 60 * 1000)), // 24 hours
+    };
+    
+    await setDoc(challengeSnapRef, challengeSnap);
+
+    // If chatId provided, also send a chat message
+    if (chatId) {
+      const messageRef = doc(collection(db, 'chats', chatId, 'messages'));
+      const messageData = {
+        senderId,
+        challengeSnapId: challengeSnapRef.id,
+        timestamp: serverTimestamp(),
+        status: 'sent' as const,
+        type: 'challenge' as const,
+      };
+      
+      await setDoc(messageRef, messageData);
+      
+      // Update chat's last message
+      await updateDoc(doc(db, 'chats', chatId), {
+        lastMessage: {
+          text: '🎯 Math Challenge',
+          senderId,
+          timestamp: serverTimestamp(),
+          type: 'challenge',
+        },
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    return challengeSnapRef.id;
+  } catch (error) {
+    console.error('Error sending challenge snap:', error);
+    throw new Error('Failed to send challenge snap');
+  }
+}
+
+/**
+ * Get math challenge by ID
+ */
+export async function getMathChallenge(challengeId: string): Promise<MathChallenge | null> {
+  try {
+    const challengeDoc = await getDoc(doc(db, 'mathChallenges', challengeId));
+    if (!challengeDoc.exists()) {
+      return null;
+    }
+    
+    return {
+      id: challengeDoc.id,
+      ...challengeDoc.data(),
+    } as MathChallenge;
+  } catch (error) {
+    console.error('Error getting math challenge:', error);
+    throw new Error('Failed to get math challenge');
+  }
+}
+
+/**
+ * Get challenge snap by ID
+ */
+export async function getChallengeSnap(challengeSnapId: string): Promise<ChallengeSnap | null> {
+  try {
+    const challengeSnapDoc = await getDoc(doc(db, 'challengeSnaps', challengeSnapId));
+    if (!challengeSnapDoc.exists()) {
+      return null;
+    }
+    
+    return {
+      id: challengeSnapDoc.id,
+      ...challengeSnapDoc.data(),
+    } as ChallengeSnap;
+  } catch (error) {
+    console.error('Error getting challenge snap:', error);
+    throw new Error('Failed to get challenge snap');
+  }
+}
+
+/**
+ * Submit an answer to a challenge snap
+ */
+export async function submitChallengeAnswer(
+  challengeSnapId: string,
+  answer: string
+): Promise<{ isCorrect: boolean; explanation?: string }> {
+  try {
+    const challengeSnapDoc = await getDoc(doc(db, 'challengeSnaps', challengeSnapId));
+    if (!challengeSnapDoc.exists()) {
+      throw new Error('Challenge snap not found');
+    }
+
+    const challengeSnap = challengeSnapDoc.data() as ChallengeSnap;
+    const challenge = await getMathChallenge(challengeSnap.challengeId);
+    
+    if (!challenge) {
+      throw new Error('Challenge not found');
+    }
+
+    // Check if answer is correct (basic string comparison for now)
+    const isCorrect = challenge.correctAnswer?.toLowerCase().trim() === answer.toLowerCase().trim();
+
+    // Update challenge snap with answer
+    await updateDoc(doc(db, 'challengeSnaps', challengeSnapId), {
+      recipientAnswer: answer,
+      isCorrect,
+      answeredAt: serverTimestamp(),
+      status: 'answered',
+    });
+
+    return {
+      isCorrect,
+      explanation: challenge.explanation,
+    };
+  } catch (error) {
+    console.error('Error submitting challenge answer:', error);
+    throw new Error('Failed to submit challenge answer');
+  }
+}
+
+/**
+ * Mark challenge snap as viewed
+ */
+export async function markChallengeSnapAsViewed(challengeSnapId: string): Promise<void> {
+  try {
+    await updateDoc(doc(db, 'challengeSnaps', challengeSnapId), {
+      status: 'viewed',
+      viewedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error marking challenge snap as viewed:', error);
+    throw new Error('Failed to mark challenge snap as viewed');
+  }
+}
+
+/**
+ * Get received challenge snaps for a user
+ */
+export async function getReceivedChallengeSnaps(userId: string): Promise<ChallengeSnap[]> {
+  try {
+    const q = query(
+      collection(db, 'challengeSnaps'),
+      where('recipientId', '==', userId),
+      where('status', 'in', ['sent', 'viewed']),
+      orderBy('sentAt', 'desc')
+    );
+    
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    } as ChallengeSnap));
+  } catch (error) {
+    console.error('Error getting received challenge snaps:', error);
+    throw new Error('Failed to get received challenge snaps');
+  }
+}
+
+/**
+ * Get sent challenge snaps for a user
+ */
+export async function getSentChallengeSnaps(userId: string): Promise<ChallengeSnap[]> {
+  try {
+    const q = query(
+      collection(db, 'challengeSnaps'),
+      where('senderId', '==', userId),
+      orderBy('sentAt', 'desc')
+    );
+    
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    } as ChallengeSnap));
+  } catch (error) {
+    console.error('Error getting sent challenge snaps:', error);
+    throw new Error('Failed to get sent challenge snaps');
   }
 } 

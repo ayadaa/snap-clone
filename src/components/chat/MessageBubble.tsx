@@ -3,12 +3,14 @@ import { View, Text, TouchableOpacity, Alert, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
-import { type Message, getSnapData, type SnapData } from '../../services/firebase/firestore.service';
+import { type Message, getSnapData, type SnapData, getChallengeSnap, getMathChallenge } from '../../services/firebase/firestore.service';
 import { type NavigationProp } from '../../types/navigation';
 import { type RootState } from '../../store';
 
 interface MessageBubbleProps {
-  message: Message;
+  message: Message & {
+    challengeSnapId?: string; // Add support for challenge messages
+  };
   isCurrentUser: boolean;
   chatType?: 'individual' | 'group'; // Add chat type to distinguish behavior
 }
@@ -25,6 +27,8 @@ export function MessageBubble({ message, isCurrentUser, chatType = 'individual' 
   const [snapData, setSnapData] = useState<SnapData | null>(null);
   const [loadingSnap, setLoadingSnap] = useState(false);
   const [hasViewedSnap, setHasViewedSnap] = useState(false);
+  const [challengeData, setChallengeData] = useState<{ concept: string; difficulty: string } | null>(null);
+  const [loadingChallenge, setLoadingChallenge] = useState(false);
 
   /**
    * Load snap data if this is a snap message
@@ -50,21 +54,49 @@ export function MessageBubble({ message, isCurrentUser, chatType = 'individual' 
   }, [message.type, message.snapId, currentUser]);
 
   /**
-   * Initial load of snap data
+   * Load challenge data if this is a challenge message
+   */
+  const loadChallengeData = React.useCallback(async () => {
+    if (message.type === 'challenge' && message.challengeSnapId && currentUser) {
+      setLoadingChallenge(true);
+      try {
+        const challengeSnap = await getChallengeSnap(message.challengeSnapId);
+        if (challengeSnap) {
+          const challenge = await getMathChallenge(challengeSnap.challengeId);
+          if (challenge) {
+            setChallengeData({
+              concept: challenge.concept,
+              difficulty: challenge.difficulty,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load challenge data:', error);
+      } finally {
+        setLoadingChallenge(false);
+      }
+    }
+  }, [message.type, message.challengeSnapId, currentUser]);
+
+  /**
+   * Initial load of snap and challenge data
    */
   useEffect(() => {
     loadSnapData();
-  }, [loadSnapData]);
+    loadChallengeData();
+  }, [loadSnapData, loadChallengeData]);
 
   /**
-   * Refresh snap data when screen comes into focus (e.g., returning from SnapViewer)
+   * Refresh data when screen comes into focus (e.g., returning from SnapViewer or ChallengeViewer)
    */
   useFocusEffect(
     React.useCallback(() => {
       if (message.type === 'snap') {
         loadSnapData();
+      } else if (message.type === 'challenge') {
+        loadChallengeData();
       }
-    }, [loadSnapData, message.type])
+    }, [loadSnapData, loadChallengeData, message.type])
   );
 
   const formatTime = (timestamp: any): string => {
@@ -85,6 +117,32 @@ export function MessageBubble({ message, isCurrentUser, chatType = 'individual' 
         chatType,
         senderId: message.senderId,
       });
+    }
+  };
+
+  /**
+   * Handle challenge message tap
+   */
+  const handleChallengeTap = () => {
+    if (message.type === 'challenge' && message.challengeSnapId) {
+      Alert.alert(
+        'Math Challenge 🎯',
+        'Ready to take on this challenge?',
+        [
+          { 
+            text: 'View Challenge', 
+            onPress: () => {
+              // Navigate directly to the ChallengeViewer
+              // Since we're in a chat context, we can navigate to any screen
+              navigation.navigate('ChallengeViewer', {
+                challengeSnapId: message.challengeSnapId!,
+                senderId: message.senderId,
+              });
+            }
+          },
+          { text: 'Later', style: 'cancel' }
+        ]
+      );
     }
   };
 
@@ -270,6 +328,106 @@ export function MessageBubble({ message, isCurrentUser, chatType = 'individual' 
     );
   };
 
+  /**
+   * Render challenge message content
+   */
+  const renderChallengeContent = () => {
+    if (loadingChallenge) {
+      return (
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingVertical: 8,
+        }}>
+          <View style={{
+            width: 60,
+            height: 60,
+            borderRadius: 8,
+            backgroundColor: 'rgba(59, 130, 246, 0.2)',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: 12,
+          }}>
+            <Ionicons name="calculator" size={24} color="#3B82F6" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{
+              color: '#FFFFFF',
+              fontSize: 16,
+              fontWeight: '500',
+            }}>
+              Loading challenge...
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <TouchableOpacity onPress={handleChallengeTap} activeOpacity={0.7}>
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingVertical: 4,
+        }}>
+          {/* Challenge icon */}
+          <View style={{
+            width: 60,
+            height: 60,
+            borderRadius: 8,
+            backgroundColor: 'rgba(59, 130, 246, 0.2)',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: 12,
+            borderWidth: 2,
+            borderColor: '#3B82F6',
+          }}>
+            <Text style={{
+              fontSize: 24,
+            }}>
+              🎯
+            </Text>
+          </View>
+          
+          <View style={{ flex: 1 }}>
+            <Text style={{
+              color: isCurrentUser ? '#FFFFFF' : '#FFFFFF',
+              fontSize: 16,
+              fontWeight: '600',
+            }}>
+              🎯 Math Challenge
+            </Text>
+            <Text style={{
+              color: isCurrentUser 
+                ? 'rgba(255, 255, 255, 0.9)' 
+                : 'rgba(255, 255, 255, 0.8)',
+              fontSize: 14,
+              marginTop: 2,
+            }}>
+              {challengeData ? `${challengeData.concept} • ${challengeData.difficulty.charAt(0).toUpperCase() + challengeData.difficulty.slice(1)}` : 'Loading challenge details...'}
+            </Text>
+            <Text style={{
+              color: isCurrentUser 
+                ? 'rgba(255, 255, 255, 0.7)' 
+                : 'rgba(255, 255, 255, 0.6)',
+              fontSize: 12,
+              marginTop: 4,
+              fontStyle: 'italic',
+            }}>
+              Tap to view and solve
+            </Text>
+          </View>
+          
+          <Ionicons 
+            name="arrow-forward-circle" 
+            size={24} 
+            color={isCurrentUser ? 'rgba(255, 255, 255, 0.8)' : 'rgba(255, 255, 255, 0.7)'} 
+          />
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   // Don't render the message at all if it's a viewed snap from another user
   // This creates the true "ephemeral" experience where snaps disappear completely
   if (message.type === 'snap' && hasViewedSnap && !isCurrentUser && !loadingSnap) {
@@ -306,6 +464,8 @@ export function MessageBubble({ message, isCurrentUser, chatType = 'individual' 
         {/* Render content based on message type */}
         {message.type === 'snap' ? (
           renderSnapContent()
+        ) : message.type === 'challenge' ? (
+          renderChallengeContent()
         ) : (
           message.text && (
             <Text

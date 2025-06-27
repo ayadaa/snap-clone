@@ -12,6 +12,7 @@ import StoryViewerScreen from '../screens/stories/StoryViewerScreen';
 import CreateGroupScreen from '../screens/chat/CreateGroupScreen';
 import GroupChatScreen from '../screens/chat/GroupChatScreen';
 import GroupSettingsScreen from '../screens/chat/GroupSettingsScreen';
+import { ChallengeViewerScreen } from '../components/rag/ChallengeViewerScreen';
 import { AppStackParamList } from '../types/navigation';
 import { CardStyleInterpolators } from '@react-navigation/stack';
 
@@ -77,6 +78,16 @@ export default function AppStackNavigator() {
         name="StoryViewer" 
         component={StoryViewerScreen}
         options={{
+          presentation: 'modal',
+          gestureEnabled: false,
+        }}
+      />
+      
+      <Stack.Screen 
+        name="ChallengeViewer" 
+        component={ChallengeViewerScreen}
+        options={{
+          headerShown: false,
           presentation: 'modal',
           gestureEnabled: false,
         }}

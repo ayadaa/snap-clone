@@ -13,6 +13,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { DefineModeScreen } from '../components/rag/DefineModeScreen';
 import { ConceptExplorerScreen } from '../components/rag/ConceptExplorerScreen';
 import { MathHubScreen } from '../components/rag/MathHubScreen';
+import { ChallengeViewerScreen } from '../components/rag/ChallengeViewerScreen';
 
 /**
  * Math Stack Parameter List
@@ -23,6 +24,10 @@ export type MathStackParamList = {
   HomeworkHelper: undefined;
   MathChallenge: undefined;
   MathHub: undefined;
+  ChallengeViewer: {
+    challengeSnapId: string;
+    senderId: string;
+  };
 };
 
 const Stack = createNativeStackNavigator<MathStackParamList>();
@@ -64,6 +69,14 @@ export function MathStackNavigator() {
         component={ConceptExplorerScreen}
         options={{
           title: 'Concept Explorer',
+        }}
+      />
+      
+      <Stack.Screen
+        name="ChallengeViewer"
+        component={ChallengeViewerScreen}
+        options={{
+          title: 'Math Challenge',
         }}
       />
       

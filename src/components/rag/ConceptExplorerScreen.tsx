@@ -38,6 +38,8 @@ import {
   selectHistory,
 } from '../../store/slices/rag.slice';
 import { formatConfidence, getConfidenceColor } from '../../services/firebase/rag.service';
+import { useMathChallenges, type CreateChallengeData } from '../../hooks/math/use-math-challenges';
+import { useFriends } from '../../hooks/friends/use-friends';
 
 const { width } = Dimensions.get('window');
 
@@ -248,6 +250,10 @@ export const ConceptExplorerScreen: React.FC = () => {
   const [depth, setDepth] = useState<'basic' | 'intermediate' | 'advanced'>('intermediate');
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
 
+  // Challenge functionality
+  const { createAndSendChallenge, isLoading: challengeLoading } = useMathChallenges();
+  const { friends } = useFriends();
+
   /**
    * Set active mode when component mounts
    */
@@ -283,6 +289,87 @@ export const ConceptExplorerScreen: React.FC = () => {
       Alert.alert(
         'Exploration Failed',
         'Unable to explore the concept. Please check your connection and try again.'
+      );
+    }
+  };
+
+  /**
+   * Handle creating a challenge from a practice problem
+   */
+  const handleChallengeFromProblem = (problem: string, conceptName: string, gradeLevel: string) => {
+    if (friends.length === 0) {
+      Alert.alert(
+        'No Friends',
+        'You need to add friends before you can send challenges. Add some friends first!',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // Show friend selection dialog
+    const friendOptions = friends.map(friend => ({
+      text: friend.username,
+      onPress: () => createChallengeForFriend(problem, conceptName, gradeLevel, friend.uid)
+    }));
+
+    Alert.alert(
+      'Challenge a Friend 🎯',
+      'Who would you like to challenge with this problem?',
+      [
+        ...friendOptions,
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
+  };
+
+  /**
+   * Create and send challenge to selected friend
+   */
+  const createChallengeForFriend = async (
+    problem: string,
+    conceptName: string,
+    gradeLevelValue: string,
+    friendId: string
+  ) => {
+    try {
+      // Extract answer from problem or ask user to provide it
+      Alert.prompt(
+        'Set Challenge Answer',
+        `What's the correct answer to this problem?\n\n"${problem}"`,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel'
+          },
+          {
+            text: 'Create Challenge',
+            onPress: async (answer) => {
+              if (!answer?.trim()) {
+                Alert.alert('Answer Required', 'Please provide the correct answer for this challenge.');
+                return;
+              }
+
+              const challengeData: CreateChallengeData = {
+                problem,
+                concept: conceptName,
+                gradeLevel: gradeLevelValue,
+                correctAnswer: answer.trim(),
+                explanation: `This problem involves ${conceptName}. Think step by step!`,
+                difficulty: depth,
+                timeLimit: 300, // 5 minutes
+              };
+
+              await createAndSendChallenge(challengeData, friendId);
+            }
+          }
+        ],
+        'plain-text'
+      );
+    } catch (error) {
+      Alert.alert(
+        'Challenge Failed',
+        'Failed to create challenge. Please try again.',
+        [{ text: 'OK' }]
       );
     }
   };
@@ -355,6 +442,7 @@ export const ConceptExplorerScreen: React.FC = () => {
                         practiceProblems,
                         [
                           { text: 'Show Solution', onPress: () => showSolution(concept, gradeLevel) },
+                          { text: 'Challenge Friend', onPress: () => handleChallengeFromProblem(practiceProblems, concept, gradeLevel) },
                           { text: 'New Problem', onPress: () => generateNewProblem(concept, gradeLevel) },
                           { text: 'Close', style: 'cancel' }
                         ]

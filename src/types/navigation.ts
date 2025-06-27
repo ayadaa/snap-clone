@@ -69,6 +69,10 @@ export type AppStackParamList = {
     initialIndex: number;
     isOwnStory?: boolean;
   };
+  ChallengeViewer: {
+    challengeSnapId: string;
+    senderId: string;
+  };
 };
 
 export type RootStackParamList = {
@@ -76,4 +80,27 @@ export type RootStackParamList = {
   Main: undefined;
 };
 
-export type NavigationProp = RNNavigationProp<AppStackParamList>; 
+export type NavigationProp = RNNavigationProp<AppStackParamList>;
+
+/**
+ * Math Challenge related types
+ */
+export type MathChallengeData = {
+  id: string;
+  problem: string;
+  concept: string;
+  gradeLevel: string;
+  solution?: string;
+  createdBy: string;
+  createdAt: number;
+  difficulty: 'basic' | 'intermediate' | 'advanced';
+};
+
+export type ChallengeSnapData = {
+  challengeId: string;
+  problem: string;
+  concept: string;
+  timeLimit?: number;
+  correctAnswer?: string;
+  explanation?: string;
+}; 
