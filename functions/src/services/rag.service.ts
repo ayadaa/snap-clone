@@ -12,21 +12,29 @@
 import { Pinecone } from '@pinecone-database/pinecone';
 import OpenAI from 'openai';
 import * as functions from 'firebase-functions';
+import { defineSecret } from 'firebase-functions/params';
 
-// Get configuration
-const config = functions.config();
+// Define secrets
+const openaiApiKey = defineSecret('OPENAI_API_KEY');
+const pineconeApiKey = defineSecret('PINECONE_API_KEY');
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: config.openai?.key || process.env.OPENAI_API_KEY,
-});
+/**
+ * Get OpenAI client instance
+ */
+function getOpenAIClient(): OpenAI {
+  return new OpenAI({
+    apiKey: openaiApiKey.value(),
+  });
+}
 
-// Initialize Pinecone client
-const pc = new Pinecone({
-  apiKey: config.pinecone?.key || process.env.PINECONE_API_KEY,
-});
-
-const index = pc.Index('k12-math-textbooks');
+/**
+ * Get Pinecone client instance
+ */
+function getPineconeClient(): Pinecone {
+  return new Pinecone({
+    apiKey: pineconeApiKey.value(),
+  });
+}
 
 /**
  * Interface for RAG query requests
@@ -62,6 +70,7 @@ export interface RagResponse {
  */
 async function createEmbedding(text: string): Promise<number[]> {
   try {
+    const openai = getOpenAIClient();
     const response = await openai.embeddings.create({
       model: 'text-embedding-3-small',
       input: text,
@@ -86,7 +95,8 @@ async function queryVectorDatabase(
   topK: number = 5
 ): Promise<any[]> {
   try {
-    const queryResponse = await index.query({
+    const pc = getPineconeClient();
+    const queryResponse = await pc.Index('k12-math-textbooks').query({
       vector: embedding,
       topK,
       includeMetadata: true,
@@ -163,6 +173,7 @@ Important guidelines:
 
 Response:`;
 
+    const openai = getOpenAIClient();
     const completion = await openai.chat.completions.create({
       model: 'gpt-4',
       messages: [

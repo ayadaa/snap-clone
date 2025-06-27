@@ -25,6 +25,10 @@ export type CameraStackParamList = {
     hasText?: boolean;
     hasDrawing?: boolean;
   };
+  HomeworkAnalysis: {
+    imageUri: string;
+    gradeLevel?: string;
+  };
 };
 
 export type MainTabParamList = {

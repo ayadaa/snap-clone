@@ -7,6 +7,7 @@ import { CameraStackParamList } from '../../types/navigation';
 import { Screen } from '../../components/common/Screen';
 import { CameraControls } from '../../components/camera/CameraControls';
 import { useCamera } from '../../hooks/camera/use-camera';
+import { Ionicons } from '@expo/vector-icons';
 
 /**
  * Camera screen component - the heart of SnapClone.
@@ -42,6 +43,7 @@ export function CameraScreen() {
   } = useCamera();
 
   const [isLoading, setIsLoading] = useState(true);
+  const [isHomeworkMode, setIsHomeworkMode] = useState(false);
 
   /**
    * Request camera permissions on mount
@@ -74,17 +76,32 @@ export function CameraScreen() {
   }, [requestPermissions]);
 
   /**
-   * Handle photo capture
+   * Toggle homework helper mode
+   */
+  const handleToggleHomeworkMode = () => {
+    setIsHomeworkMode(prev => !prev);
+  };
+
+  /**
+   * Handle photo capture - different behavior for homework mode
    */
   const handleCapture = async () => {
     try {
       const photo = await takePhoto();
       if (photo) {
-        // Navigate to snap editor with photo
-        navigation.navigate('SnapEditor', {
-          mediaUri: photo.uri,
-          mediaType: 'photo',
-        });
+        if (isHomeworkMode) {
+          // Navigate to homework analysis screen
+          navigation.navigate('HomeworkAnalysis', {
+            imageUri: photo.uri,
+            gradeLevel: undefined, // Could be set from user profile
+          });
+        } else {
+          // Navigate to snap editor with photo
+          navigation.navigate('SnapEditor', {
+            mediaUri: photo.uri,
+            mediaType: 'photo',
+          });
+        }
       }
     } catch (error) {
       console.error('Error capturing photo:', error);
@@ -169,14 +186,24 @@ export function CameraScreen() {
           flash={flashMode}
           ratio="16:9"
         >
+          {/* Homework Mode Indicator */}
+          {isHomeworkMode && (
+            <View style={styles.homeworkModeIndicator}>
+              <Ionicons name="calculator" size={20} color="#FFD700" />
+              <Text style={styles.homeworkModeText}>Homework Helper</Text>
+            </View>
+          )}
+
           {/* Camera Controls Overlay */}
           <CameraControls
             cameraType={cameraType}
             flashMode={flashMode}
             isRecording={isRecording}
             recordingDuration={recordingDuration}
+            isHomeworkMode={isHomeworkMode}
             onToggleCamera={toggleCameraType}
             onToggleFlash={toggleFlashMode}
+            onToggleHomeworkMode={handleToggleHomeworkMode}
             onCapture={handleCapture}
             onStartRecording={handleStartRecording}
             onStopRecording={handleStopRecording}
@@ -223,6 +250,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     lineHeight: 24,
+  },
+  homeworkModeIndicator: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: 5,
+    borderRadius: 5,
+  },
+  homeworkModeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 });
  

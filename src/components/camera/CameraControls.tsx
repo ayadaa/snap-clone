@@ -14,11 +14,13 @@ interface CameraControlsProps {
   flashMode: FlashMode;
   isRecording: boolean;
   recordingDuration: number;
+  isHomeworkMode?: boolean;
   onToggleCamera: () => void;
   onToggleFlash: () => void;
   onCapture: () => void;
   onStartRecording: () => void;
   onStopRecording: () => void;
+  onToggleHomeworkMode?: () => void;
   formatRecordingDuration: (duration: number) => string;
 }
 
@@ -27,11 +29,13 @@ export function CameraControls({
   flashMode,
   isRecording,
   recordingDuration,
+  isHomeworkMode = false,
   onToggleCamera,
   onToggleFlash,
   onCapture,
   onStartRecording,
   onStopRecording,
+  onToggleHomeworkMode,
   formatRecordingDuration,
 }: CameraControlsProps) {
   /**
@@ -87,6 +91,26 @@ export function CameraControls({
           </View>
         </TouchableOpacity>
 
+        {/* Homework Helper Mode Button */}
+        {onToggleHomeworkMode && (
+          <TouchableOpacity
+            style={styles.controlButton}
+            onPress={onToggleHomeworkMode}
+            activeOpacity={0.7}
+          >
+            <View style={[
+              styles.glassButton,
+              isHomeworkMode && styles.homeworkModeActive
+            ]}>
+              <Ionicons 
+                name="calculator" 
+                size={24} 
+                color={isHomeworkMode ? "#FFD700" : "white"} 
+              />
+            </View>
+          </TouchableOpacity>
+        )}
+
         {/* Recording Duration Indicator */}
         {isRecording && (
           <View style={styles.recordingIndicator}>
@@ -118,7 +142,8 @@ export function CameraControls({
         <TouchableOpacity
           style={[
             styles.captureButton,
-            isRecording && styles.captureButtonRecording
+            isRecording && styles.captureButtonRecording,
+            isHomeworkMode && styles.captureButtonHomework
           ]}
           onPress={handleCapturePress}
           onLongPress={handleCaptureLongPress}
@@ -126,15 +151,18 @@ export function CameraControls({
         >
           <View style={[
             styles.captureButtonInner,
-            isRecording && styles.captureButtonInnerRecording
+            isRecording && styles.captureButtonInnerRecording,
+            isHomeworkMode && styles.captureButtonInnerHomework
           ]} />
         </TouchableOpacity>
 
         {/* Instructions */}
         <Text style={styles.instructionText}>
-          {isRecording 
-            ? 'Tap to stop • Recording...' 
-            : 'Tap for photo • Hold for video'
+          {isHomeworkMode 
+            ? 'Snap your homework for help!' 
+            : isRecording 
+              ? 'Tap to stop • Recording...' 
+              : 'Tap for photo • Hold for video'
           }
         </Text>
       </View>
@@ -237,10 +265,24 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#FF0000',
   },
+  captureButtonHomework: {
+    borderColor: '#FFD700',
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+  },
+  captureButtonInnerHomework: {
+    width: 30,
+    height: 30,
+    borderRadius: 4,
+    backgroundColor: '#FFD700',
+  },
   instructionText: {
     color: 'rgba(255, 255, 255, 0.8)',
     fontSize: 14,
     textAlign: 'center',
     fontWeight: '500',
+  },
+  homeworkModeActive: {
+    borderColor: '#FFD700',
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
   },
 }); 

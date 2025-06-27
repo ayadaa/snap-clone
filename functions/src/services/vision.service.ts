@@ -10,11 +10,19 @@
 
 import OpenAI from 'openai';
 import * as functions from 'firebase-functions';
+import { defineSecret } from 'firebase-functions/params';
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: functions.config().openai.key,
-});
+// Define secret
+const openaiApiKey = defineSecret('OPENAI_API_KEY');
+
+/**
+ * Get OpenAI client instance
+ */
+function getOpenAIClient(): OpenAI {
+  return new OpenAI({
+    apiKey: openaiApiKey.value(),
+  });
+}
 
 /**
  * Interface for image analysis requests
@@ -87,8 +95,8 @@ Be thorough in extracting mathematical content, including:
 
 If you can't clearly see mathematical content, set confidence to a lower value and explain what you can see.`;
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4-vision-preview',
+    const response = await getOpenAIClient().chat.completions.create({
+      model: 'gpt-4o',
       messages: [
         {
           role: 'user',
