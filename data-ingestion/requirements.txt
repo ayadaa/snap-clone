@@ -1,0 +1,19 @@
+# Used for making HTTP requests to download PDFs
+requests
+
+# Used for extracting text from PDF files
+pdfplumber
+
+# Official OpenAI Python client for creating embeddings and GPT-4 calls
+openai
+
+# Official Pinecone client for upserting vectors (new package name)
+pinecone
+
+# Used to manage environment variables for local development
+# This allows us to use a local .env file for API keys
+# without committing them to git.
+python-dotenv
+
+# Provides a progress bar for long-running operations like embedding
+tqdm 
