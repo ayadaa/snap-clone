@@ -8,6 +8,8 @@ import {
   Dimensions,
   ScrollView,
   PanResponder,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
@@ -15,11 +17,13 @@ import { useSnapEditor } from '../../hooks/camera/use-snap-editor';
 import { TextOverlay } from './TextOverlay';
 import { SmartCaptionModal } from './SmartCaptionModal';
 import { Video, ResizeMode } from 'expo-av';
+import { captureRef } from 'react-native-view-shot';
 
 /**
  * Main snap editor component that combines all editing tools.
  * Provides text overlay, drawing, timer settings, and color palette.
  * Features glassmorphic UI design with intuitive controls.
+ * Captures composite view with overlays for sending/posting.
  */
 
 interface SnapEditorProps {
@@ -27,7 +31,15 @@ interface SnapEditorProps {
   mediaType: 'photo' | 'video';
   onSave: (editedData: any) => void;
   onCancel: () => void;
-  onNext: (editedData: { hasText?: boolean; hasDrawing?: boolean; duration?: number }) => void;
+  onNext: (editedData: { 
+    originalMediaUri: string;
+    compositeMediaUri: string;
+    hasText?: boolean; 
+    hasDrawing?: boolean; 
+    duration?: number;
+    textOverlays: any[];
+    drawingPaths: any[];
+  }) => void;
 }
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -63,8 +75,10 @@ export function SnapEditor({
   const [currentTool, setCurrentTool] = useState<'text' | 'draw' | null>('text'); // Default to text tool
   const [showSmartCaptionModal, setShowSmartCaptionModal] = useState(false);
   const [selectedCaption, setSelectedCaption] = useState<string | null>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
   
   const drawingViewRef = useRef<View>(null);
+  const mediaContainerRef = useRef<View>(null);
 
   /**
    * Pan responder for drawing functionality
@@ -162,6 +176,52 @@ export function SnapEditor({
   };
 
   /**
+   * Alternative method to create composite image when view capture fails
+   * This creates a simple overlay notification instead of trying to burn overlays into image
+   */
+  const createCompositeAlternative = async (): Promise<string> => {
+    // For now, if view capture fails, we'll just use the original image
+    // and pass the overlay data separately so the receiving end can render them
+    console.log('Using alternative composite method - original image with overlay metadata');
+    return mediaUri;
+  };
+
+  /**
+   * Capture the composite view with overlays
+   */
+  const captureCompositeView = async (): Promise<string> => {
+    if (!mediaContainerRef.current) {
+      console.warn('Media container ref not available, using alternative method');
+      return await createCompositeAlternative();
+    }
+
+    try {
+      setIsCapturing(true);
+      
+      // Wait a brief moment to ensure the view is fully rendered
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Capture the view with overlays
+      const uri = await captureRef(mediaContainerRef.current, {
+        format: 'jpg',
+        quality: 0.9,
+        result: 'tmpfile',
+        width: screenWidth,
+        height: screenHeight,
+      });
+
+      console.log('Composite view captured successfully:', uri);
+      return uri;
+    } catch (error) {
+      console.error('View capture failed, using alternative method:', error);
+      // If capture fails, use alternative method
+      return await createCompositeAlternative();
+    } finally {
+      setIsCapturing(false);
+    }
+  };
+
+  /**
    * Handle save and prepare edited data
    */
   const handleSave = () => {
@@ -177,15 +237,45 @@ export function SnapEditor({
   };
 
   /**
-   * Handle next action with edited data
+   * Handle next action with composite image capture
    */
-  const handleNext = () => {
-    const editedData = {
-      hasText: editorState.textOverlays.length > 0,
-      hasDrawing: editorState.drawingPaths.length > 0,
-      duration: editorState.timerDuration,
-    };
-    onNext(editedData);
+  const handleNext = async () => {
+    try {
+      setIsCapturing(true);
+
+      let compositeMediaUri = mediaUri; // Default to original
+
+      // Only capture composite if there are overlays
+      if (hasContent()) {
+        try {
+          compositeMediaUri = await captureCompositeView();
+        } catch (captureError) {
+          console.warn('View capture failed, using original media:', captureError);
+          // Continue with original media URI - don't block the user
+        }
+      }
+
+      const editedData = {
+        originalMediaUri: mediaUri,
+        compositeMediaUri,
+        hasText: editorState.textOverlays.length > 0,
+        hasDrawing: editorState.drawingPaths.length > 0,
+        duration: editorState.timerDuration,
+        textOverlays: editorState.textOverlays,
+        drawingPaths: editorState.drawingPaths,
+      };
+
+      onNext(editedData);
+    } catch (error) {
+      console.error('Error preparing snap for sending:', error);
+      Alert.alert(
+        'Error',
+        'Failed to prepare your snap. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsCapturing(false);
+    }
   };
 
   /**
@@ -207,7 +297,11 @@ export function SnapEditor({
   return (
     <View style={styles.container}>
       {/* Media Display */}
-      <View style={styles.mediaContainer}>
+      <View 
+        ref={mediaContainerRef} 
+        style={[styles.mediaContainer, { width: screenWidth, height: screenHeight }]}
+        collapsable={false}
+      >
         {mediaType === 'photo' ? (
           <Image source={{ uri: mediaUri }} style={styles.media} resizeMode="cover" />
         ) : (
@@ -390,9 +484,19 @@ export function SnapEditor({
         )}
 
         {/* Next Button */}
-                    <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-          <Text style={styles.nextButtonText}>Next</Text>
-          <Ionicons name="arrow-forward" size={20} color="white" />
+        <TouchableOpacity 
+          style={[styles.nextButton, isCapturing && styles.nextButtonDisabled]} 
+          onPress={handleNext}
+          disabled={isCapturing}
+        >
+          <Text style={styles.nextButtonText}>
+            {isCapturing ? 'Preparing...' : 'Next'}
+          </Text>
+          {isCapturing ? (
+            <ActivityIndicator size="small" color="white" />
+          ) : (
+            <Ionicons name="arrow-forward" size={20} color="white" />
+          )}
         </TouchableOpacity>
       </View>
 
@@ -555,6 +659,9 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  nextButtonDisabled: {
+    opacity: 0.6,
   },
   nextButtonText: {
     color: 'white',

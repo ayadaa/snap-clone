@@ -43,15 +43,26 @@ export function SnapEditorScreen() {
   /**
    * Handle next action - proceed to sending
    */
-  const handleNext = (editedData: { hasText?: boolean; hasDrawing?: boolean; duration?: number }) => {
+  const handleNext = (editedData: { 
+    originalMediaUri: string;
+    compositeMediaUri: string;
+    hasText?: boolean; 
+    hasDrawing?: boolean; 
+    duration?: number;
+    textOverlays: any[];
+    drawingPaths: any[];
+  }) => {
     console.log('Proceeding to sending with data:', editedData);
     
     navigation.navigate('SendTo', {
-      mediaUri,
+      originalMediaUri: editedData.originalMediaUri,
+      compositeMediaUri: editedData.compositeMediaUri,
       mediaType,
       duration: editedData.duration || (mediaType === 'photo' ? 5 : 15), // Default durations
       hasText: editedData.hasText || false,
       hasDrawing: editedData.hasDrawing || false,
+      textOverlays: editedData.textOverlays || [],
+      drawingPaths: editedData.drawingPaths || [],
     });
   };
 

@@ -19,11 +19,14 @@ export type CameraStackParamList = {
     mediaType: 'photo' | 'video';
   };
   SendTo: {
-    mediaUri: string;
+    originalMediaUri: string;
+    compositeMediaUri: string;
     mediaType: 'photo' | 'video';
     duration: number;
     hasText?: boolean;
     hasDrawing?: boolean;
+    textOverlays?: any[];
+    drawingPaths?: any[];
   };
   HomeworkAnalysis: {
     imageUri: string;

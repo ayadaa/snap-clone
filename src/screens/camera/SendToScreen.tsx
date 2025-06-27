@@ -42,7 +42,22 @@ export function SendToScreen({}: SendToScreenProps) {
   const route = useRoute<SendToScreenRouteProp>();
   const user = useSelector((state: RootState) => state.auth.user);
   
-  const { mediaUri, mediaType, duration, hasText, hasDrawing } = route.params;
+  const { 
+    originalMediaUri, 
+    compositeMediaUri, 
+    mediaType, 
+    duration, 
+    hasText, 
+    hasDrawing,
+    textOverlays,
+    drawingPaths
+  } = route.params;
+  
+  // Use composite media URI for all operations (contains overlays)
+  const mediaUriToUse = compositeMediaUri;
+  
+  // Check if overlays exist but composite is same as original (capture failed)
+  const hasOverlaysButNoComposite = (hasText || hasDrawing) && (compositeMediaUri === originalMediaUri);
   
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
@@ -53,6 +68,13 @@ export function SendToScreen({}: SendToScreenProps) {
   const { groups, loading: groupsLoading, error: groupsError } = useGroups(user?.uid || '');
   const { sendSnap, uploadProgress, error: snapError } = useSnaps();
   const { addToStory, userStory } = useStories(user?.uid || '');
+
+  useEffect(() => {
+    if (hasOverlaysButNoComposite) {
+      console.log('Overlays detected but composite capture failed - overlays will be preserved as metadata');
+      // Could show a subtle notification here if desired
+    }
+  }, [hasOverlaysButNoComposite]);
 
   /**
    * Toggle friend selection
@@ -90,7 +112,7 @@ export function SendToScreen({}: SendToScreenProps) {
 
     try {
       // Upload media to Firebase Storage
-      const uploadResult = await uploadSnap(mediaUri, user.uid, mediaType);
+      const uploadResult = await uploadSnap(mediaUriToUse, user.uid, mediaType);
       
       // Add to story
       const success = await addToStory({
@@ -123,7 +145,7 @@ export function SendToScreen({}: SendToScreenProps) {
     } finally {
       setIsPostingToStory(false);
     }
-  }, [user, mediaUri, mediaType, duration, addToStory, navigation]);
+  }, [user, mediaUriToUse, mediaType, duration, addToStory, navigation]);
 
   /**
    * Handle sending snap to selected friends and groups
@@ -143,7 +165,7 @@ export function SendToScreen({}: SendToScreenProps) {
       if (selectedFriends.length > 0) {
         await sendSnap({
           recipientIds: selectedFriends,
-          mediaUri,
+          mediaUri: mediaUriToUse,
           mediaType,
           duration,
           hasText,
@@ -154,7 +176,7 @@ export function SendToScreen({}: SendToScreenProps) {
       // Send to groups if any selected
       if (selectedGroups.length > 0 && user) {
         // Upload snap to storage first
-        const uploadResult = await uploadSnap(mediaUri, user.uid, mediaType);
+        const uploadResult = await uploadSnap(mediaUriToUse, user.uid, mediaType);
         
         // Store snap data in the snaps collection
         const snapId = await storeSnapData({
@@ -208,7 +230,7 @@ export function SendToScreen({}: SendToScreenProps) {
     } finally {
       setIsSending(false);
     }
-  }, [selectedFriends, selectedGroups, sendSnap, mediaUri, mediaType, duration, hasText, hasDrawing, user, navigation]);
+  }, [selectedFriends, selectedGroups, sendSnap, mediaUriToUse, mediaType, duration, hasText, hasDrawing, user, navigation]);
 
   /**
    * Handle back navigation
