@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, Platform } from 'react-native';
 import { ChatScreen } from '../screens/chat/ChatScreen';
 import { CameraStackNavigator } from './CameraStackNavigator';
+import { MathStackNavigator } from './MathStackNavigator';
 import { FriendsStackNavigator } from './FriendsStackNavigator';
 import StoriesScreen from '../screens/stories/StoriesScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
@@ -12,8 +13,9 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 /**
  * Main tab navigator for authenticated users.
- * Provides bottom tab navigation between Chat, Camera (center), Friends, Stories, and Profile.
+ * Provides bottom tab navigation between Chat, Camera, Math, Friends, Stories, and Profile.
  * Follows SnapChat's core navigation pattern with Camera as the default screen.
+ * Added Math tab for MathSnap RAG features.
  */
 export function MainTabNavigator() {
   return (
@@ -65,6 +67,22 @@ export function MainTabNavigator() {
             </Text>
           ),
           tabBarLabel: 'Camera',
+        }}
+      />
+
+      <Tab.Screen
+        name="Math"
+        component={MathStackNavigator}
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <Text style={{ 
+              fontSize: 20, 
+              color: focused ? '#0084FF' : 'rgba(255, 255, 255, 0.6)' 
+            }}>
+              🧮
+            </Text>
+          ),
+          tabBarLabel: 'Math',
         }}
       />
 

@@ -13,14 +13,17 @@ import { Pinecone } from '@pinecone-database/pinecone';
 import OpenAI from 'openai';
 import * as functions from 'firebase-functions';
 
+// Get configuration
+const config = functions.config();
+
 // Initialize OpenAI client
 const openai = new OpenAI({
-  apiKey: functions.config().openai.key,
+  apiKey: config.openai?.key || process.env.OPENAI_API_KEY,
 });
 
 // Initialize Pinecone client
 const pc = new Pinecone({
-  apiKey: functions.config().pinecone.key,
+  apiKey: config.pinecone?.key || process.env.PINECONE_API_KEY,
 });
 
 const index = pc.Index('k12-math-textbooks');
