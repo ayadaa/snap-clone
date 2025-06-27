@@ -23,6 +23,7 @@ import {
   ActivityIndicator,
   Dimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
 // Removed Picker import - using custom dropdown instead
 import { AppDispatch } from '../../store';
@@ -244,6 +245,7 @@ export const ConceptExplorerScreen: React.FC = () => {
   const currentConcept = useSelector(selectCurrentConcept);
   const userGradeLevel = useSelector(selectUserGradeLevel);
   const history = useSelector(selectHistory);
+  const insets = useSafeAreaInsets();
 
   const [concept, setConcept] = useState('');
   const [gradeLevel, setGradeLevel] = useState(userGradeLevel);
@@ -536,7 +538,7 @@ export const ConceptExplorerScreen: React.FC = () => {
     <View style={styles.container}>
       <ScrollView style={styles.scrollContainer}>
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
           <Text style={styles.title}>🔍 Concept Explorer</Text>
           <Text style={styles.subtitle}>
             Explore mathematical concepts in depth with examples and practice problems
