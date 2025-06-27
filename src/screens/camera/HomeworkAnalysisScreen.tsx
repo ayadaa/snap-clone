@@ -259,21 +259,6 @@ export function HomeworkAnalysisScreen() {
 
               {/* Sources */}
               {renderSources(analysisState.result.sources)}
-
-              {/* Suggested Actions */}
-              {analysisState.result.suggestedActions && analysisState.result.suggestedActions.length > 0 && (
-                <View style={styles.actionsContainer}>
-                  <Text style={styles.sectionTitle}>🎯 What's Next?</Text>
-                  {analysisState.result.suggestedActions.map((action, index) => (
-                    <View key={index} style={styles.actionItem}>
-                      <Text style={styles.actionType}>
-                        {action.type.replace('_', ' ').toUpperCase()}
-                      </Text>
-                      <Text style={styles.actionDescription}>{action.description}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
             </View>
           )}
         </ScrollView>
@@ -481,27 +466,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     fontWeight: '500',
-  },
-  actionsContainer: {
-    backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 12,
-  },
-  actionItem: {
-    backgroundColor: '#f8f9fa',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  actionType: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#007AFF',
-    marginBottom: 4,
-  },
-  actionDescription: {
-    fontSize: 14,
-    color: '#333',
-    lineHeight: 18,
   },
 }); 
