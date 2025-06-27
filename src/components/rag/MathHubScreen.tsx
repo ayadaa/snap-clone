@@ -46,24 +46,6 @@ const MATH_FEATURES = [
     color: '#2196F3',
     available: true,
   },
-  {
-    id: 'homework-helper',
-    title: '📝 Homework Helper',
-    description: 'Get help with math problems from photos',
-    subtitle: 'Coming soon - Snap your homework for help',
-    route: 'HomeworkHelper' as keyof MathStackParamList,
-    color: '#FF9800',
-    available: false,
-  },
-  {
-    id: 'math-challenge',
-    title: '🏆 Math Challenge',
-    description: 'Daily math challenges and competitions',
-    subtitle: 'Coming soon - Challenge friends and track progress',
-    route: 'MathChallenge' as keyof MathStackParamList,
-    color: '#9C27B0',
-    available: false,
-  },
 ];
 
 /**
