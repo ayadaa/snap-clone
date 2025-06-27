@@ -1,0 +1,846 @@
+/**
+ * @fileoverview Concept Explorer Screen Component
+ * 
+ * This component implements User Story #4: "Concept Explorer"
+ * Allows students to explore mathematical concepts in depth with:
+ * - Comprehensive explanations
+ * - Clear examples
+ * - Practice problems
+ * - Visual aids (text-based for now)
+ * - Grade-level appropriate content
+ */
+
+import * as React from 'react';
+import { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  Dimensions,
+} from 'react-native';
+import { useDispatch, useSelector } from 'react-redux';
+// Removed Picker import - using custom dropdown instead
+import { AppDispatch } from '../../store';
+import {
+  fetchConcept,
+  setActiveMode,
+  setUserGradeLevel,
+  setPreferredDepth,
+  selectIsLoading,
+  selectError,
+  selectCurrentConcept,
+  selectUserGradeLevel,
+  selectHistory,
+} from '../../store/slices/rag.slice';
+import { formatConfidence, getConfidenceColor } from '../../services/firebase/rag.service';
+
+const { width } = Dimensions.get('window');
+
+/**
+ * Grade level options for concept exploration
+ */
+const GRADE_LEVELS = [
+  { label: 'Elementary (K-5)', value: 'elementary' },
+  { label: '6th Grade', value: '6th' },
+  { label: '7th Grade', value: '7th' },
+  { label: '8th Grade', value: '8th' },
+  { label: '9th Grade', value: '9th' },
+  { label: '10th Grade', value: '10th' },
+  { label: '11th Grade', value: '11th' },
+  { label: '12th Grade', value: '12th' },
+  { label: 'General', value: 'general' },
+];
+
+/**
+ * Depth level options for concept exploration
+ */
+const DEPTH_LEVELS = [
+  { label: 'Basic Overview', value: 'basic' },
+  { label: 'Detailed Explanation', value: 'intermediate' },
+  { label: 'Advanced Analysis', value: 'advanced' },
+];
+
+/**
+ * Popular math concepts for quick access
+ */
+const POPULAR_CONCEPTS = [
+  'Pythagorean theorem',
+  'Quadratic equations',
+  'Derivatives',
+  'Fractions',
+  'Algebra',
+  'Geometry',
+  'Trigonometry',
+  'Statistics',
+  'Probability',
+  'Calculus',
+];
+
+/**
+ * Generate practice problems based on concept and grade level
+ */
+function generatePracticeProblems(concept: string, gradeLevel: string): string {
+  const problems: Record<string, Record<string, string[]>> = {
+    'pythagorean theorem': {
+      '9th': ['Find the hypotenuse of a right triangle with legs 3 and 4.', 'A right triangle has legs of 5 and 12. What is the hypotenuse?'],
+      '10th': ['A ladder 13 feet long leans against a wall. The base is 5 feet from the wall. How high up the wall does it reach?', 'Find the missing side of a right triangle with hypotenuse 25 and one leg 15.'],
+      '11th': ['In a coordinate plane, find the distance between points (3,4) and (7,1).', 'A rectangular field is 40m by 30m. What is the diagonal distance?']
+    },
+    'quadratic equations': {
+      '8th': ['Solve: x² = 25', 'Find x when x² - 9 = 0'],
+      '9th': ['Solve: x² + 5x + 6 = 0', 'Factor: x² - 7x + 12 = 0'],
+      '10th': ['Solve using the quadratic formula: 2x² + 3x - 2 = 0', 'Find the vertex of y = x² - 4x + 3']
+    },
+    'derivatives': {
+      '11th': ['Find the derivative of f(x) = 3x²', 'What is the slope of y = x³ at x = 2?'],
+      '12th': ['Find f\'(x) for f(x) = 2x³ - 5x² + 3x - 1', 'Use the product rule to find the derivative of (x² + 1)(x - 3)']
+    }
+  };
+  
+  const conceptKey = concept.toLowerCase();
+  const gradeKey = gradeLevel.toLowerCase();
+  
+  if (problems[conceptKey] && problems[conceptKey][gradeKey]) {
+    const conceptProblems = problems[conceptKey][gradeKey];
+    return conceptProblems[Math.floor(Math.random() * conceptProblems.length)];
+  }
+  
+  return `Practice problem for ${concept} (${gradeLevel} level):\n\nSolve a problem involving ${concept}. Use the concepts you just learned to work through this step by step.`;
+}
+
+/**
+ * Show detailed solution for a concept
+ */
+function showSolution(concept: string, gradeLevel: string, problem?: string): void {
+  const solutions: Record<string, Record<string, string[]>> = {
+    'pythagorean theorem': {
+      '9th': [
+        'Problem: Find the hypotenuse of a right triangle with legs 3 and 4.\n\nSolution:\n1. Use the Pythagorean theorem: a² + b² = c²\n2. Substitute: 3² + 4² = c²\n3. Calculate: 9 + 16 = c²\n4. Simplify: 25 = c²\n5. Take the square root: c = 5\n\nAnswer: The hypotenuse is 5 units.',
+        'Problem: A right triangle has legs of 5 and 12. What is the hypotenuse?\n\nSolution:\n1. Apply a² + b² = c²\n2. Substitute: 5² + 12² = c²\n3. Calculate: 25 + 144 = c²\n4. Simplify: 169 = c²\n5. Take square root: c = 13\n\nAnswer: The hypotenuse is 13 units.'
+      ],
+      '10th': [
+        'Problem: A ladder 13 feet long leans against a wall. The base is 5 feet from the wall. How high up the wall does it reach?\n\nSolution:\n1. This forms a right triangle\n2. Ladder = hypotenuse = 13 ft\n3. Base = one leg = 5 ft\n4. Height = other leg = ?\n5. Use: 5² + h² = 13²\n6. Calculate: 25 + h² = 169\n7. Solve: h² = 144\n8. Therefore: h = 12 ft\n\nAnswer: The ladder reaches 12 feet up the wall.'
+      ]
+    },
+    'quadratic equations': {
+      '9th': [
+        'Problem: Solve x² + 5x + 6 = 0\n\nSolution:\n1. Factor the quadratic\n2. Find two numbers that multiply to 6 and add to 5\n3. Those numbers are 2 and 3\n4. Factor: (x + 2)(x + 3) = 0\n5. Set each factor to zero:\n   x + 2 = 0  →  x = -2\n   x + 3 = 0  →  x = -3\n\nAnswer: x = -2 or x = -3'
+      ],
+      '10th': [
+        'Problem: Solve 2x² + 3x - 2 = 0 using the quadratic formula\n\nSolution:\n1. Identify: a = 2, b = 3, c = -2\n2. Use formula: x = [-b ± √(b² - 4ac)] / 2a\n3. Substitute: x = [-3 ± √(9 - 4(2)(-2))] / 4\n4. Simplify: x = [-3 ± √(9 + 16)] / 4\n5. Calculate: x = [-3 ± √25] / 4\n6. Solve: x = [-3 ± 5] / 4\n7. Two solutions: x = 2/4 = 1/2 or x = -8/4 = -2\n\nAnswer: x = 1/2 or x = -2'
+      ]
+    },
+    'derivatives': {
+      '11th': [
+        'Problem: Find the derivative of f(x) = 3x²\n\nSolution:\n1. Use the power rule: d/dx[xⁿ] = n·xⁿ⁻¹\n2. For 3x²: coefficient stays, power comes down\n3. Apply rule: d/dx[3x²] = 3 · 2 · x²⁻¹\n4. Simplify: f\'(x) = 6x¹ = 6x\n\nAnswer: f\'(x) = 6x'
+      ],
+      '12th': [
+        'Problem: Find f\'(x) for f(x) = 2x³ - 5x² + 3x - 1\n\nSolution:\n1. Differentiate each term separately\n2. For 2x³: 3 · 2 · x² = 6x²\n3. For -5x²: 2 · (-5) · x¹ = -10x\n4. For 3x: 1 · 3 · x⁰ = 3\n5. For -1: derivative of constant = 0\n6. Combine: f\'(x) = 6x² - 10x + 3\n\nAnswer: f\'(x) = 6x² - 10x + 3'
+      ]
+    }
+  };
+
+  const conceptKey = concept.toLowerCase();
+  const gradeKey = gradeLevel.toLowerCase();
+  
+  let solutionText = '';
+  if (solutions[conceptKey] && solutions[conceptKey][gradeKey]) {
+    const conceptSolutions = solutions[conceptKey][gradeKey];
+    solutionText = conceptSolutions[Math.floor(Math.random() * conceptSolutions.length)];
+  } else {
+    solutionText = `Solution approach for ${concept}:\n\n1. Read the problem carefully\n2. Identify the given information\n3. Determine what you need to find\n4. Choose the appropriate formula or method\n5. Substitute values and solve step by step\n6. Check your answer makes sense\n\nFor more specific help, try exploring the concept first or ask your teacher.`;
+  }
+
+  Alert.alert(
+    'Step-by-Step Solution',
+    solutionText,
+    [
+      { text: 'New Problem', onPress: () => generateNewProblem(concept, gradeLevel) },
+      { text: 'Explore Related', onPress: () => exploreRelatedConcepts(concept) },
+      { text: 'Close', style: 'cancel' }
+    ]
+  );
+}
+
+/**
+ * Generate a new practice problem
+ */
+function generateNewProblem(concept: string, gradeLevel: string): void {
+  const newProblem = generatePracticeProblems(concept, gradeLevel);
+  Alert.alert(
+    'New Practice Problem',
+    newProblem,
+    [
+      { text: 'Show Solution', onPress: () => showSolution(concept, gradeLevel) },
+      { text: 'Another Problem', onPress: () => generateNewProblem(concept, gradeLevel) },
+      { text: 'Close', style: 'cancel' }
+    ]
+  );
+}
+
+/**
+ * Explore related concepts
+ */
+function exploreRelatedConcepts(concept: string): void {
+  const relatedConcepts: Record<string, string[]> = {
+    'pythagorean theorem': ['Right triangles', 'Distance formula', 'Trigonometry', 'Special right triangles'],
+    'quadratic equations': ['Factoring', 'Completing the square', 'Parabolas', 'Vertex form'],
+    'derivatives': ['Limits', 'Chain rule', 'Product rule', 'Applications of derivatives'],
+    'fractions': ['Decimals', 'Percentages', 'Ratios', 'Proportions'],
+    'geometry': ['Area and perimeter', 'Volume', 'Similar triangles', 'Coordinate geometry']
+  };
+
+  const related = relatedConcepts[concept.toLowerCase()] || ['Basic algebra', 'Number theory', 'Mathematical reasoning'];
+  const conceptList = related.map((c, i) => `${i + 1}. ${c}`).join('\n');
+  
+  Alert.alert(
+    'Related Concepts',
+    `Concepts related to ${concept}:\n\n${conceptList}\n\nExploring these will deepen your understanding!`,
+    [
+      { text: 'Close', style: 'cancel' }
+    ]
+  );
+}
+
+/**
+ * Explore visual concepts related to the main concept
+ */
+function exploreVisualConcept(concept: string): void {
+  const visualSuggestions: Record<string, string> = {
+    'pythagorean theorem': 'Draw right triangles with different side lengths. Try the 3-4-5 triangle, then 5-12-13. Notice the pattern!\n\nVisual ideas:\n• Draw squares on each side to see why a² + b² = c²\n• Use graph paper to plot right triangles\n• Try the "Pythagorean proof by rearrangement"',
+    'quadratic equations': 'Graph parabolas to see how solutions relate to x-intercepts.\n\nVisual ideas:\n• Use graphing calculator or Desmos\n• Plot y = x², y = x² + 2x + 1, etc.\n• See how the vertex and roots connect\n• Try completing the square visually',
+    'derivatives': 'Visualize slopes and tangent lines on curves.\n\nVisual ideas:\n• Draw secant lines approaching tangent lines\n• Use online graphing tools like Desmos\n• Sketch f(x) and f\'(x) on the same axes\n• Try the "zooming in" approach to see limits',
+    'fractions': 'Use visual models like pie charts and number lines.\n\nVisual ideas:\n• Draw circles divided into equal parts\n• Use fraction bars or strips\n• Plot fractions on number lines\n• Try fraction multiplication with area models',
+    'geometry': 'Create physical models and accurate diagrams.\n\nVisual ideas:\n• Use compass and straightedge constructions\n• Build 3D models with cardboard\n• Use coordinate geometry on graph paper\n• Try dynamic geometry software like GeoGebra'
+  };
+  
+  const suggestion = visualSuggestions[concept.toLowerCase()] || 
+    `Create visual representations for ${concept}:\n\n• Draw diagrams and sketches\n• Use online graphing tools\n• Build physical models\n• Watch educational videos\n• Try interactive simulations`;
+  
+  Alert.alert(
+    'Visual Learning Guide',
+    suggestion,
+    [
+      { text: 'Explore Related', onPress: () => exploreRelatedConcepts(concept) },
+      { text: 'Close', style: 'cancel' }
+    ]
+  );
+}
+
+/**
+ * Concept Explorer Screen Component
+ */
+export const ConceptExplorerScreen: React.FC = () => {
+  const dispatch = useDispatch<AppDispatch>();
+  const isLoading = useSelector(selectIsLoading);
+  const error = useSelector(selectError);
+  const currentConcept = useSelector(selectCurrentConcept);
+  const userGradeLevel = useSelector(selectUserGradeLevel);
+  const history = useSelector(selectHistory);
+
+  const [concept, setConcept] = useState('');
+  const [gradeLevel, setGradeLevel] = useState(userGradeLevel);
+  const [depth, setDepth] = useState<'basic' | 'intermediate' | 'advanced'>('intermediate');
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+
+  /**
+   * Set active mode when component mounts
+   */
+  useEffect(() => {
+    dispatch(setActiveMode('concept'));
+    return () => {
+      dispatch(setActiveMode(null));
+    };
+  }, [dispatch]);
+
+  /**
+   * Handle concept exploration
+   */
+  const handleExploreConcept = async () => {
+    if (!concept.trim()) {
+      Alert.alert('Input Required', 'Please enter a mathematical concept to explore.');
+      return;
+    }
+
+    try {
+      // Update user preferences
+      dispatch(setUserGradeLevel(gradeLevel));
+      dispatch(setPreferredDepth(depth));
+
+      // Fetch concept explanation
+      await dispatch(fetchConcept({
+        concept: concept.trim(),
+        gradeLevel,
+        depth,
+      })).unwrap();
+
+    } catch (error) {
+      Alert.alert(
+        'Exploration Failed',
+        'Unable to explore the concept. Please check your connection and try again.'
+      );
+    }
+  };
+
+  /**
+   * Handle quick concept selection
+   */
+  const handleQuickConcept = async (selectedConcept: string) => {
+    setConcept(selectedConcept);
+    
+    try {
+      // Update user preferences
+      dispatch(setUserGradeLevel(gradeLevel));
+      dispatch(setPreferredDepth(depth));
+
+      // Fetch concept explanation
+      await dispatch(fetchConcept({
+        concept: selectedConcept.trim(),
+        gradeLevel,
+        depth,
+      })).unwrap();
+
+    } catch (error) {
+      Alert.alert(
+        'Exploration Failed',
+        'Unable to explore the concept. Please check your connection and try again.'
+      );
+    }
+  };
+
+  /**
+   * Render concept response
+   */
+  const renderConceptResponse = () => {
+    if (!currentConcept) return null;
+
+    return (
+      <View style={styles.responseContainer}>
+        <View style={styles.responseHeader}>
+          <Text style={styles.responseTitle}>Concept Exploration</Text>
+          <View style={[
+            styles.confidenceBadge,
+            { backgroundColor: getConfidenceColor(currentConcept.confidence) }
+          ]}>
+            <Text style={styles.confidenceText}>
+              {formatConfidence(currentConcept.confidence)}
+            </Text>
+          </View>
+        </View>
+
+        <ScrollView style={styles.explanationContainer}>
+          <Text style={styles.explanationText}>
+            {currentConcept.explanation}
+          </Text>
+
+          {/* Suggested Actions */}
+          {currentConcept.suggestedActions && currentConcept.suggestedActions.length > 0 && (
+            <View style={styles.actionsContainer}>
+              <Text style={styles.actionsTitle}>Try These Next:</Text>
+              {currentConcept.suggestedActions.map((action, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.actionButton}
+                  onPress={() => {
+                    if (action.type === 'practice_problem') {
+                      // Generate a practice problem based on the concept
+                      const practiceProblems = generatePracticeProblems(concept, gradeLevel);
+                      Alert.alert(
+                        'Practice Problem',
+                        practiceProblems,
+                        [
+                          { text: 'Show Solution', onPress: () => showSolution(concept, gradeLevel) },
+                          { text: 'New Problem', onPress: () => generateNewProblem(concept, gradeLevel) },
+                          { text: 'Close', style: 'cancel' }
+                        ]
+                      );
+                    } else if (action.type === 'visual_aid') {
+                      // Show visual representation info
+                      Alert.alert(
+                        'Visual Representation',
+                        `For ${concept}, you can visualize this concept by:\n\n• Drawing diagrams on paper\n• Using online graphing tools\n• Creating physical models\n• Watching educational videos\n\nWould you like to explore a related visual concept?`,
+                        [
+                          { text: 'Explore Related', onPress: () => exploreVisualConcept(concept) },
+                          { text: 'Close', style: 'cancel' }
+                        ]
+                      );
+                    } else if (action.type === 'related_concept') {
+                      setConcept(action.description);
+                      handleExploreConcept();
+                    }
+                  }}
+                >
+                  <Text style={styles.actionButtonText}>
+                    {action.type === 'practice_problem' ? '📝' : 
+                     action.type === 'visual_aid' ? '📊' :
+                     action.type === 'related_concept' ? '🔗' : '💡'} {action.description}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {/* Sources */}
+          <View style={styles.sourcesContainer}>
+            <Text style={styles.sourcesTitle}>Sources:</Text>
+            {currentConcept.sources.map((source, index) => (
+              <View key={index} style={styles.sourceItem}>
+                <Text style={styles.sourceText}>
+                  • {source.book}
+                  {source.chapter && ` - Chapter ${source.chapter}`}
+                  {source.section && ` - ${source.section}`}
+                </Text>
+                <Text style={styles.relevanceText}>
+                  Relevance: {Math.round(source.relevanceScore * 100)}%
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Processing Time */}
+          {currentConcept.processingTime && (
+            <Text style={styles.processingTime}>
+              Processed in {(currentConcept.processingTime / 1000).toFixed(1)}s
+            </Text>
+          )}
+        </ScrollView>
+      </View>
+    );
+  };
+
+  /**
+   * Render recent concepts from history
+   */
+  const renderRecentConcepts = () => {
+    const recentConcepts = history
+      .filter(item => item.type === 'concept')
+      .slice(0, 5);
+
+    if (recentConcepts.length === 0) return null;
+
+    return (
+      <View style={styles.recentContainer}>
+        <Text style={styles.recentTitle}>Recent Explorations:</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {recentConcepts.map((item) => (
+            <TouchableOpacity
+              key={item.id}
+              style={styles.recentItem}
+              onPress={() => {
+                setConcept(item.query);
+                handleExploreConcept();
+              }}
+            >
+              <Text style={styles.recentItemText}>{item.query}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollContainer}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>🔍 Concept Explorer</Text>
+          <Text style={styles.subtitle}>
+            Explore mathematical concepts in depth with examples and practice problems
+          </Text>
+        </View>
+
+        {/* Input Section */}
+        <View style={styles.inputSection}>
+          <Text style={styles.inputLabel}>Mathematical Concept:</Text>
+          <TextInput
+            style={styles.conceptInput}
+            value={concept}
+            onChangeText={setConcept}
+            placeholder="e.g., Pythagorean theorem, derivatives, fractions..."
+            placeholderTextColor="#999"
+            multiline={false}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+
+          {/* Grade Level Selection */}
+          <Text style={styles.inputLabel}>Grade Level:</Text>
+          <TouchableOpacity
+            style={styles.dropdownButton}
+            onPress={() => {
+              Alert.alert(
+                'Select Grade Level',
+                'Choose your grade level',
+                GRADE_LEVELS.map(level => ({
+                  text: level.label,
+                  onPress: () => setGradeLevel(level.value)
+                }))
+              );
+            }}
+          >
+            <Text style={styles.dropdownText}>
+              {GRADE_LEVELS.find(level => level.value === gradeLevel)?.label || 'Select Grade'}
+            </Text>
+            <Text style={styles.dropdownArrow}>▼</Text>
+          </TouchableOpacity>
+
+          {/* Advanced Options Toggle */}
+          <TouchableOpacity
+            style={styles.advancedToggle}
+            onPress={() => setShowAdvancedOptions(!showAdvancedOptions)}
+          >
+            <Text style={styles.advancedToggleText}>
+              {showAdvancedOptions ? '▼' : '▶'} Advanced Options
+            </Text>
+          </TouchableOpacity>
+
+          {/* Advanced Options */}
+          {showAdvancedOptions && (
+            <View style={styles.advancedOptions}>
+              <Text style={styles.inputLabel}>Explanation Depth:</Text>
+              <TouchableOpacity
+                style={styles.dropdownButton}
+                onPress={() => {
+                  Alert.alert(
+                    'Select Explanation Depth',
+                    'Choose how detailed you want the explanation',
+                    DEPTH_LEVELS.map(level => ({
+                      text: level.label,
+                      onPress: () => setDepth(level.value as 'basic' | 'intermediate' | 'advanced')
+                    }))
+                  );
+                }}
+              >
+                <Text style={styles.dropdownText}>
+                  {DEPTH_LEVELS.find(level => level.value === depth)?.label || 'Select Depth'}
+                </Text>
+                <Text style={styles.dropdownArrow}>▼</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Explore Button */}
+          <TouchableOpacity
+            style={[styles.exploreButton, isLoading && styles.exploreButtonDisabled]}
+            onPress={handleExploreConcept}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.exploreButtonText}>🔍 Explore Concept</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Quick Access to Popular Concepts */}
+        <View style={styles.quickAccessContainer}>
+          <Text style={styles.quickAccessTitle}>Popular Concepts:</Text>
+          <View style={styles.quickAccessGrid}>
+            {POPULAR_CONCEPTS.map((popularConcept) => (
+              <TouchableOpacity
+                key={popularConcept}
+                style={styles.quickAccessButton}
+                onPress={() => handleQuickConcept(popularConcept)}
+                disabled={isLoading}
+              >
+                <Text style={styles.quickAccessButtonText}>{popularConcept}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Recent Concepts */}
+        {renderRecentConcepts()}
+
+        {/* Error Display */}
+        {error && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>⚠️ {error}</Text>
+          </View>
+        )}
+
+        {/* Concept Response */}
+        {renderConceptResponse()}
+      </ScrollView>
+    </View>
+  );
+};
+
+/**
+ * Styles for the Concept Explorer Screen
+ */
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+  },
+  scrollContainer: {
+    flex: 1,
+  },
+  header: {
+    padding: 20,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#666',
+    lineHeight: 22,
+  },
+  inputSection: {
+    padding: 20,
+    backgroundColor: '#fff',
+    marginTop: 10,
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+    marginTop: 16,
+  },
+  conceptInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    backgroundColor: '#f9f9f9',
+    minHeight: 50,
+  },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 12,
+    backgroundColor: '#f9f9f9',
+    overflow: 'hidden',
+  },
+  picker: {
+    height: 50,
+  },
+  dropdownButton: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 12,
+    backgroundColor: '#f9f9f9',
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    minHeight: 50,
+  },
+  dropdownText: {
+    fontSize: 16,
+    color: '#333',
+    flex: 1,
+  },
+  dropdownArrow: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 8,
+  },
+  advancedToggle: {
+    paddingVertical: 12,
+    marginTop: 8,
+  },
+  advancedToggleText: {
+    fontSize: 16,
+    color: '#007AFF',
+    fontWeight: '500',
+  },
+  advancedOptions: {
+    marginTop: 8,
+  },
+  exploreButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  exploreButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  exploreButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  quickAccessContainer: {
+    padding: 20,
+    backgroundColor: '#fff',
+    marginTop: 10,
+  },
+  quickAccessTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
+  quickAccessGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  quickAccessButton: {
+    backgroundColor: '#f0f0f0',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    minWidth: (width - 60) / 2,
+    alignItems: 'center',
+  },
+  quickAccessButtonText: {
+    fontSize: 14,
+    color: '#333',
+    textAlign: 'center',
+  },
+  recentContainer: {
+    padding: 20,
+    backgroundColor: '#fff',
+    marginTop: 10,
+  },
+  recentTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
+  recentItem: {
+    backgroundColor: '#e3f2fd',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  recentItemText: {
+    fontSize: 14,
+    color: '#1976d2',
+  },
+  errorContainer: {
+    margin: 20,
+    padding: 16,
+    backgroundColor: '#ffebee',
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#f44336',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#c62828',
+  },
+  responseContainer: {
+    margin: 20,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  responseHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#f5f5f5',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  responseTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+  confidenceBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  confidenceText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  explanationContainer: {
+    maxHeight: 400,
+  },
+  explanationText: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#333',
+    padding: 16,
+  },
+  actionsContainer: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  actionsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
+  actionButton: {
+    backgroundColor: '#e8f4fd',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  actionButtonText: {
+    fontSize: 14,
+    color: '#1976d2',
+  },
+  sourcesContainer: {
+    padding: 16,
+    backgroundColor: '#f9f9f9',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  sourcesTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 8,
+  },
+  sourceItem: {
+    marginBottom: 8,
+  },
+  sourceText: {
+    fontSize: 14,
+    color: '#555',
+  },
+  relevanceText: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 2,
+  },
+  processingTime: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
+    padding: 8,
+    fontStyle: 'italic',
+  },
+});
+
+export default ConceptExplorerScreen; 

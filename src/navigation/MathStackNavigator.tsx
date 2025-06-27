@@ -11,6 +11,8 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { DefineModeScreen } from '../components/rag/DefineModeScreen';
+import { ConceptExplorerScreen } from '../components/rag/ConceptExplorerScreen';
+import { MathHubScreen } from '../components/rag/MathHubScreen';
 
 /**
  * Math Stack Parameter List
@@ -39,8 +41,16 @@ export function MathStackNavigator() {
         gestureEnabled: true,
         animation: 'slide_from_right',
       }}
-      initialRouteName="DefineMode"
+      initialRouteName="MathHub"
     >
+      <Stack.Screen
+        name="MathHub"
+        component={MathHubScreen}
+        options={{
+          title: 'Math Hub',
+        }}
+      />
+      
       <Stack.Screen
         name="DefineMode"
         component={DefineModeScreen}
@@ -49,8 +59,6 @@ export function MathStackNavigator() {
         }}
       />
       
-      {/* Future screens for other user stories */}
-      {/* 
       <Stack.Screen
         name="ConceptExplorer"
         component={ConceptExplorerScreen}
@@ -59,6 +67,8 @@ export function MathStackNavigator() {
         }}
       />
       
+      {/* Future screens for other user stories */}
+      {/* 
       <Stack.Screen
         name="HomeworkHelper"
         component={HomeworkHelperScreen}
