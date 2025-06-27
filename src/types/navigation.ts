@@ -90,6 +90,20 @@ export type RootStackParamList = {
 export type NavigationProp = RNNavigationProp<AppStackParamList>;
 
 /**
+ * Math Stack Parameter List
+ */
+export type MathStackParamList = {
+  DefineMode: undefined;
+  ConceptExplorer: undefined;
+  HomeworkHelper: undefined;
+  MathChallenge: undefined;
+  MathHub: undefined;
+  ChallengeViewer: undefined;
+};
+
+export type MathStackNavigationProp = RNNavigationProp<MathStackParamList>;
+
+/**
  * Math Challenge related types
  */
 export type MathChallengeData = {

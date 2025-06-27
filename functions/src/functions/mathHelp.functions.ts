@@ -20,6 +20,7 @@ import {
   ImageAnalysisRequest,
   ImageAnalysisResult 
 } from '../services/vision.service';
+import * as admin from 'firebase-admin';
 
 // Define secrets
 const openaiApiKey = defineSecret('OPENAI_API_KEY');
@@ -82,6 +83,57 @@ interface SmartCaptionResponse {
 interface ExtendedRagResponse extends RagResponse {
   processingTime?: number;
   imageAnalysis?: ImageAnalysisResult;
+}
+
+/**
+ * Daily Challenge Interfaces
+ */
+interface DailyChallengeRequest {
+  gradeLevel: string; // e.g., "3rd", "7th", "11th"
+  challengeType?: 'word-problem' | 'equation' | 'multiple-choice' | 'concept';
+  date?: string; // ISO date string, defaults to today
+}
+
+interface DailyChallengeResponse {
+  success: boolean;
+  challenge?: {
+    id: string;
+    date: string;
+    gradeLevel: string;
+    type: string;
+    problem: string;
+    hint?: string;
+    difficulty: 'easy' | 'medium' | 'hard';
+    points: number;
+    concepts: string[];
+    sources: Array<{
+      book: string;
+      chapter: string;
+      section: string;
+    }>;
+  };
+  error?: string;
+}
+
+interface ChallengeSubmissionRequest {
+  challengeId: string;
+  answer: string;
+  submissionType: 'text' | 'image';
+  imageUrl?: string;
+}
+
+interface ChallengeSubmissionResponse {
+  success: boolean;
+  result?: {
+    isCorrect: boolean;
+    score: number;
+    feedback: string;
+    correctAnswer?: string;
+    explanation?: string;
+    streak?: number;
+    totalPoints?: number;
+  };
+  error?: string;
 }
 
 /**
@@ -674,4 +726,503 @@ function determineDifficulty(imageAnalysis: ImageAnalysisResult, gradeLevel?: st
   }
   
   return 'easy';
-} 
+}
+
+/**
+ * Generate Daily Math Challenge
+ * Creates a daily math challenge tailored to the user's grade level
+ */
+export const generateDailyChallenge = functions
+  .runWith({
+    timeoutSeconds: 540,
+    memory: '1GB',
+    secrets: ['OPENAI_API_KEY', 'PINECONE_API_KEY']
+  })
+  .https
+  .onCall(async (data: DailyChallengeRequest, context): Promise<DailyChallengeResponse> => {
+    try {
+      // Verify authentication
+      if (!context.auth) {
+        throw new functions.https.HttpsError(
+          'unauthenticated',
+          'User must be authenticated to generate daily challenges.'
+        );
+      }
+
+      const { gradeLevel, challengeType = 'word-problem', date } = data;
+      const challengeDate = date || new Date().toISOString().split('T')[0];
+      
+      functions.logger.info('Generating daily challenge:', { gradeLevel, challengeType, challengeDate });
+
+      // Check if challenge already exists for this date and grade level
+      const existingChallenge = await admin.firestore()
+        .collection('dailyChallenges')
+        .where('date', '==', challengeDate)
+        .where('gradeLevel', '==', gradeLevel)
+        .limit(1)
+        .get();
+
+      if (!existingChallenge.empty) {
+        const challenge = existingChallenge.docs[0].data();
+        return {
+          success: true,
+          challenge: {
+            id: existingChallenge.docs[0].id,
+            ...challenge
+          } as any
+        };
+      }
+
+             // Generate new challenge using RAG
+       const challengePrompt = `Generate a ${challengeType} math problem appropriate for ${gradeLevel} grade level. 
+       The problem should be engaging and educational, suitable for a daily challenge.
+       Include a hint that guides students without giving away the answer.
+       Format: Problem statement, followed by [HINT: helpful guidance]`;
+
+       const ragResponse = await processRagQuery({
+         query: challengePrompt,
+         queryType: 'concept_exploration',
+         gradeLevel,
+         includeExamples: true
+       });
+
+             if (!ragResponse.explanation) {
+         throw new Error('Failed to generate challenge content');
+       }
+
+       // Parse the generated content
+       const content = ragResponse.explanation;
+       const hintMatch = content.match(/\[HINT:\s*(.*?)\]/);
+       const problem = content.replace(/\[HINT:.*?\]/, '').trim();
+       const hint = hintMatch ? hintMatch[1] : undefined;
+
+      // Determine difficulty and points based on grade level
+      const gradeNum = parseInt(gradeLevel.replace(/\D/g, '')) || 1;
+      let difficulty: 'easy' | 'medium' | 'hard';
+      let points: number;
+
+      if (gradeNum <= 3) {
+        difficulty = 'easy';
+        points = 10;
+      } else if (gradeNum <= 8) {
+        difficulty = 'medium';
+        points = 15;
+      } else {
+        difficulty = 'hard';
+        points = 25;
+      }
+
+      // Create challenge object
+      const challenge = {
+        id: `challenge_${challengeDate}_${gradeLevel}`,
+        date: challengeDate,
+        gradeLevel,
+        type: challengeType,
+        problem,
+        hint,
+        difficulty,
+        points,
+                 concepts: [], // Will be extracted from sources
+        sources: ragResponse.sources || [],
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        expiresAt: admin.firestore.Timestamp.fromDate(
+          new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+        )
+      };
+
+      // Save to Firestore
+      await admin.firestore()
+        .collection('dailyChallenges')
+        .doc(challenge.id)
+        .set(challenge);
+
+      functions.logger.info('Daily challenge generated successfully:', challenge.id);
+
+      return {
+        success: true,
+        challenge: {
+          ...challenge,
+          createdAt: undefined, // Remove server timestamp for response
+          expiresAt: undefined
+        } as any
+      };
+
+    } catch (error) {
+      functions.logger.error('Error generating daily challenge:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to generate daily challenge'
+      };
+    }
+  });
+
+/**
+ * Submit Challenge Answer
+ * Processes and scores user submissions for daily challenges
+ */
+export const submitChallengeAnswer = functions
+  .runWith({
+    timeoutSeconds: 300,
+    memory: '512MB',
+    secrets: ['OPENAI_API_KEY']
+  })
+  .https
+  .onCall(async (data: ChallengeSubmissionRequest, context): Promise<ChallengeSubmissionResponse> => {
+    try {
+      // Verify authentication
+      if (!context.auth) {
+        throw new functions.https.HttpsError(
+          'unauthenticated',
+          'User must be authenticated to submit challenge answers.'
+        );
+      }
+
+      const { challengeId, answer, submissionType, imageUrl } = data;
+      const userId = context.auth.uid;
+
+      functions.logger.info('Processing challenge submission:', { challengeId, submissionType, userId });
+
+      // Get challenge details
+      const challengeDoc = await admin.firestore()
+        .collection('dailyChallenges')
+        .doc(challengeId)
+        .get();
+
+      if (!challengeDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'Challenge not found');
+      }
+
+      const challenge = challengeDoc.data()!;
+
+      // Check if user already submitted for this challenge
+      const existingSubmission = await admin.firestore()
+        .collection('challengeSubmissions')
+        .where('userId', '==', userId)
+        .where('challengeId', '==', challengeId)
+        .limit(1)
+        .get();
+
+      if (!existingSubmission.empty) {
+        throw new functions.https.HttpsError('already-exists', 'You have already submitted an answer for this challenge');
+      }
+
+             // Process image submission if needed
+       let processedAnswer = answer;
+       if (submissionType === 'image' && imageUrl) {
+         try {
+           const visionResponse = await analyzeImageForMath({
+             imageUrl,
+             analysisType: 'general'
+           });
+           processedAnswer = visionResponse.extractedText || answer;
+         } catch (error) {
+           functions.logger.warn('Failed to process image submission:', error);
+           // Continue with text answer as fallback
+         }
+       }
+
+      // Evaluate answer using OpenAI
+      const evaluationPrompt = `
+        Math Problem: ${challenge.problem}
+        Student Answer: ${processedAnswer}
+        
+        IMPORTANT: Be very generous in your evaluation. Accept equivalent answers in different formats.
+        For example:
+        - "5 weeks" = "35 days" = "5 wks" = "five weeks"
+        - "$12" = "12 dollars" = "$12.00"
+        - "1/2" = "0.5" = "50%" = "one half"
+        
+        Evaluate if the student's answer is mathematically correct or equivalent to the correct answer.
+        
+        Provide encouraging feedback regardless of correctness. If correct, celebrate their success!
+        If incorrect, be supportive and educational.
+        
+        Format your response as JSON:
+        {
+          "isCorrect": boolean,
+          "feedback": "string (always encouraging)",
+          "correctAnswer": "string (only if incorrect)",
+          "explanation": "string (brief solution steps)"
+        }
+      `;
+
+      const openai = getOpenAIClient();
+      const evaluationResponse = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a helpful math tutor evaluating student answers. Be encouraging and educational.'
+          },
+          {
+            role: 'user',
+            content: evaluationPrompt
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 500
+      });
+
+      const evaluationContent = evaluationResponse.choices[0]?.message?.content;
+      if (!evaluationContent) {
+        throw new Error('Failed to evaluate answer');
+      }
+
+      // Clean and parse JSON response (remove markdown code blocks if present)
+      const cleanedContent = evaluationContent
+        .replace(/```json\s*/g, '')
+        .replace(/```\s*/g, '')
+        .trim();
+
+      let evaluation;
+      try {
+        evaluation = JSON.parse(cleanedContent);
+      } catch (parseError) {
+        functions.logger.error('Failed to parse evaluation response:', { 
+          content: evaluationContent, 
+          cleaned: cleanedContent,
+          error: parseError 
+        });
+        throw new Error('Failed to parse evaluation response');
+      }
+      const isCorrect = evaluation.isCorrect;
+      
+      // More generous scoring system
+      let score: number;
+      if (isCorrect) {
+        // Full points for correct answers
+        score = challenge.points;
+      } else {
+        // More generous partial credit (50% instead of 30%)
+        score = Math.floor(challenge.points * 0.5);
+      }
+
+      // Update user's challenge progress
+      const userProgressRef = admin.firestore()
+        .collection('users')
+        .doc(userId)
+        .collection('challengeProgress')
+        .doc('stats');
+
+      const userProgress = await userProgressRef.get();
+      const currentStats = userProgress.exists ? userProgress.data()! : {
+        totalChallenges: 0,
+        correctAnswers: 0,
+        currentStreak: 0,
+        bestStreak: 0,
+        totalPoints: 0,
+        lastChallengeDate: null
+      };
+
+      // Calculate streak
+      const today = new Date().toISOString().split('T')[0];
+      const lastDate = currentStats.lastChallengeDate;
+      let newStreak = currentStats.currentStreak;
+
+      if (isCorrect) {
+        if (lastDate === today) {
+          // Same day, don't change streak
+        } else if (lastDate === new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]) {
+          // Yesterday, increment streak
+          newStreak = currentStats.currentStreak + 1;
+        } else {
+          // Gap in days, reset streak
+          newStreak = 1;
+        }
+      } else {
+        // Incorrect answer doesn't break streak but doesn't extend it
+      }
+
+      const updatedStats = {
+        totalChallenges: currentStats.totalChallenges + 1,
+        correctAnswers: currentStats.correctAnswers + (isCorrect ? 1 : 0),
+        currentStreak: newStreak,
+        bestStreak: Math.max(currentStats.bestStreak, newStreak),
+        totalPoints: currentStats.totalPoints + score,
+        lastChallengeDate: today
+      };
+
+      // Save submission and update stats
+      const batch = admin.firestore().batch();
+
+      // Save submission
+      const submissionRef = admin.firestore().collection('challengeSubmissions').doc();
+      batch.set(submissionRef, {
+        userId,
+        challengeId,
+        answer: processedAnswer,
+        submissionType,
+        imageUrl: imageUrl || null,
+        isCorrect,
+        score,
+        feedback: evaluation.feedback,
+        submittedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      // Update user stats
+      batch.set(userProgressRef, updatedStats, { merge: true });
+
+      await batch.commit();
+
+      functions.logger.info('Challenge submission processed:', { userId, challengeId, isCorrect, score });
+
+      return {
+        success: true,
+        result: {
+          isCorrect,
+          score,
+          feedback: evaluation.feedback,
+          correctAnswer: evaluation.correctAnswer,
+          explanation: evaluation.explanation,
+          streak: newStreak,
+          totalPoints: updatedStats.totalPoints
+        }
+      };
+
+    } catch (error) {
+      functions.logger.error('Error processing challenge submission:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to process submission'
+      };
+    }
+  });
+
+/**
+ * Internal helper function to generate a new daily challenge
+ */
+async function generateNewDailyChallenge(gradeLevel: string, challengeDate: string): Promise<DailyChallengeResponse> {
+  try {
+    const challengeType = 'word-problem';
+    
+    functions.logger.info('Generating daily challenge:', { gradeLevel, challengeType, challengeDate });
+
+    // Generate new challenge using RAG
+    const challengePrompt = `Generate a ${challengeType} math problem appropriate for ${gradeLevel} grade level. 
+    The problem should be engaging and educational, suitable for a daily challenge.
+    Include a hint that guides students without giving away the answer.
+    Format: Problem statement, followed by [HINT: helpful guidance]`;
+
+    const ragResponse = await processRagQuery({
+      query: challengePrompt,
+      queryType: 'concept_exploration',
+      gradeLevel,
+      includeExamples: true
+    });
+
+    if (!ragResponse.explanation) {
+      throw new Error('Failed to generate challenge content');
+    }
+
+    // Parse the generated content
+    const content = ragResponse.explanation;
+    const hintMatch = content.match(/\[HINT:\s*(.*?)\]/);
+    const problem = content.replace(/\[HINT:.*?\]/, '').trim();
+    const hint = hintMatch ? hintMatch[1] : undefined;
+
+    // Determine difficulty and points based on grade level
+    const gradeNum = parseInt(gradeLevel.replace(/\D/g, '')) || 1;
+    let difficulty: 'easy' | 'medium' | 'hard';
+    let points: number;
+
+    if (gradeNum <= 3) {
+      difficulty = 'easy';
+      points = 10;
+    } else if (gradeNum <= 8) {
+      difficulty = 'medium';
+      points = 15;
+    } else {
+      difficulty = 'hard';
+      points = 25;
+    }
+
+    // Create challenge object
+    const challenge = {
+      id: `challenge_${challengeDate}_${gradeLevel}`,
+      date: challengeDate,
+      gradeLevel,
+      type: challengeType,
+      problem,
+      hint: hint || null, // Ensure hint is not undefined
+      difficulty,
+      points,
+      concepts: [], // Will be extracted from sources
+      sources: ragResponse.sources || [],
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt: admin.firestore.Timestamp.fromDate(
+        new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+      )
+    };
+
+    // Save to Firestore
+    await admin.firestore()
+      .collection('dailyChallenges')
+      .doc(challenge.id)
+      .set(challenge);
+
+    functions.logger.info('Daily challenge generated successfully:', challenge.id);
+
+    return {
+      success: true,
+      challenge: {
+        ...challenge,
+        createdAt: undefined, // Remove server timestamp for response
+        expiresAt: undefined
+      } as any
+    };
+
+  } catch (error) {
+    functions.logger.error('Error generating daily challenge:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to generate daily challenge'
+    };
+  }
+}
+
+/**
+ * Get Daily Challenge
+ * Retrieves the daily challenge for a user's grade level
+ */
+export const getDailyChallenge = functions
+  .runWith({
+    secrets: [openaiApiKey, pineconeApiKey]
+  })
+  .https
+  .onCall(async (data: { gradeLevel: string; date?: string }, context): Promise<DailyChallengeResponse> => {
+    try {
+      checkAuth(context, 'get daily challenges');
+
+      const { gradeLevel, date } = data;
+      const challengeDate = date || new Date().toISOString().split('T')[0];
+
+      // Try to get existing challenge
+      const challengeQuery = await admin.firestore()
+        .collection('dailyChallenges')
+        .where('date', '==', challengeDate)
+        .where('gradeLevel', '==', gradeLevel)
+        .limit(1)
+        .get();
+
+      if (!challengeQuery.empty) {
+        const challenge = challengeQuery.docs[0].data();
+        return {
+          success: true,
+          challenge: {
+            id: challengeQuery.docs[0].id,
+            ...challenge
+          } as any
+        };
+      }
+
+             // If no challenge exists, generate one
+       return await generateNewDailyChallenge(gradeLevel, challengeDate);
+
+    } catch (error) {
+      functions.logger.error('Error getting daily challenge:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to get daily challenge'
+      };
+    }
+  }); 

@@ -21,6 +21,9 @@ export {
   exploreConcept,
   checkRagHealth,
   generateSmartCaption,
+  generateDailyChallenge,
+  submitChallengeAnswer,
+  getDailyChallenge,
 } from "./functions/mathHelp.functions";
 
 // Note: Additional functions can be exported here as the project grows

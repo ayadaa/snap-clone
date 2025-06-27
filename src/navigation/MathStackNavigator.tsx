@@ -21,10 +21,7 @@ export type MathStackParamList = {
   HomeworkHelper: undefined;
   MathChallenge: undefined;
   MathHub: undefined;
-  ChallengeViewer: {
-    challengeSnapId: string;
-    senderId: string;
-  };
+  ChallengeViewer: undefined;
 };
 
 const Stack = createNativeStackNavigator<MathStackParamList>();

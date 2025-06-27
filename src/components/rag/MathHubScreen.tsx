@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MathStackParamList } from '../../navigation/MathStackNavigator';
+import { DailyChallengeCard } from './DailyChallengeCard';
 
 const { width } = Dimensions.get('window');
 
@@ -127,6 +128,9 @@ export const MathHubScreen: React.FC = () => {
             get definitions, or solve problems with AI assistance.
           </Text>
         </View>
+
+        {/* Daily Challenge */}
+        <DailyChallengeCard />
 
         {/* Features Grid */}
         <View style={styles.featuresContainer}>
