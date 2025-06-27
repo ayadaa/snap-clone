@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { useSnapEditor } from '../../hooks/camera/use-snap-editor';
 import { TextOverlay } from './TextOverlay';
+import { SmartCaptionModal } from './SmartCaptionModal';
 import { Video, ResizeMode } from 'expo-av';
 
 /**
@@ -60,6 +61,8 @@ export function SnapEditor({
   const [showColorPalette, setShowColorPalette] = useState(false);
   const [showTimerSettings, setShowTimerSettings] = useState(false);
   const [currentTool, setCurrentTool] = useState<'text' | 'draw' | null>('text'); // Default to text tool
+  const [showSmartCaptionModal, setShowSmartCaptionModal] = useState(false);
+  const [selectedCaption, setSelectedCaption] = useState<string | null>(null);
   
   const drawingViewRef = useRef<View>(null);
 
@@ -185,6 +188,22 @@ export function SnapEditor({
     onNext(editedData);
   };
 
+  /**
+   * Handle smart caption selection
+   */
+  const handleCaptionSelect = (caption: string) => {
+    setSelectedCaption(caption);
+    // Add the caption as a text overlay at the bottom center
+    addTextOverlay(screenWidth / 2, screenHeight * 0.8, caption);
+  };
+
+  /**
+   * Open smart caption modal
+   */
+  const openSmartCaptionModal = () => {
+    setShowSmartCaptionModal(true);
+  };
+
   return (
     <View style={styles.container}>
       {/* Media Display */}
@@ -299,6 +318,14 @@ export function SnapEditor({
 
           <TouchableOpacity
             style={styles.toolButton}
+            onPress={openSmartCaptionModal}
+          >
+            <Ionicons name="sparkles" size={24} color="#FFD700" />
+            <Text style={styles.toolLabel}>Caption</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.toolButton}
             onPress={() => setShowColorPalette(!showColorPalette)}
           >
             <View style={[styles.colorPreview, { backgroundColor: editorState.selectedColor }]} />
@@ -379,6 +406,15 @@ export function SnapEditor({
           </Text>
         </View>
       )}
+
+      {/* Smart Caption Modal */}
+      <SmartCaptionModal
+        visible={showSmartCaptionModal}
+        imageUrl={mediaUri}
+        onClose={() => setShowSmartCaptionModal(false)}
+        onSelectCaption={handleCaptionSelect}
+        gradeLevel="9" // Default grade level - could be made configurable
+      />
     </View>
   );
 }

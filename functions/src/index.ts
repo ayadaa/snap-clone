@@ -22,6 +22,7 @@ export {
   getDefinition,
   exploreConcept,
   checkRagHealth,
+  generateSmartCaption,
 } from "./functions/mathHelp.functions";
 
 // Note: Additional functions can be exported here as the project grows

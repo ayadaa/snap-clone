@@ -54,6 +54,27 @@ interface ConceptRequest {
 }
 
 /**
+ * Interface for smart caption generation requests
+ */
+interface SmartCaptionRequest {
+  imageUrl: string;
+  gradeLevel?: string;
+  captionStyle?: 'casual' | 'celebratory' | 'educational' | 'motivational';
+  includeHashtags?: boolean;
+  includeEmojis?: boolean;
+}
+
+/**
+ * Interface for smart caption response
+ */
+interface SmartCaptionResponse {
+  captions: string[];
+  detectedConcepts: string[];
+  difficulty: 'easy' | 'medium' | 'hard';
+  processingTime: number;
+}
+
+/**
  * Extended RAG response with additional properties for frontend
  */
 interface ExtendedRagResponse extends RagResponse {
@@ -71,6 +92,16 @@ function checkAuth(context: functions.https.CallableContext, operation: string):
       `User must be authenticated to ${operation}`
     );
   }
+}
+
+/**
+ * Get OpenAI client instance
+ */
+function getOpenAIClient() {
+  const OpenAI = require('openai');
+  return new OpenAI({
+    apiKey: openaiApiKey.value(),
+  });
 }
 
 /**
@@ -404,4 +435,241 @@ export const checkRagHealth = functions
         };
       }
     }
-  ); 
+  );
+
+/**
+ * Generate smart captions for math Snaps
+ * 
+ * This function analyzes math images and generates engaging, educational captions
+ * that students can use when sharing their work on social media or stories.
+ */
+export const generateSmartCaption = functions
+  .runWith({
+    secrets: [openaiApiKey, pineconeApiKey]
+  })
+  .https.onCall(
+    async (data: SmartCaptionRequest, context: functions.https.CallableContext): Promise<SmartCaptionResponse> => {
+      const startTime = Date.now();
+      
+      try {
+        checkAuth(context, 'generate smart captions');
+
+        const { 
+          imageUrl, 
+          gradeLevel, 
+          captionStyle = 'casual',
+          includeHashtags = true,
+          includeEmojis = true 
+        } = data;
+
+        if (!imageUrl || typeof imageUrl !== 'string') {
+          throw new functions.https.HttpsError(
+            'invalid-argument',
+            'Image URL is required and must be a string'
+          );
+        }
+
+        // Step 1: Analyze the image to understand the math content
+        const imageAnalysis: ImageAnalysisResult = await analyzeImageForMath({
+          imageUrl,
+          gradeLevel,
+          analysisType: 'general'
+        });
+
+        if (!imageAnalysis.extractedText) {
+          throw new functions.https.HttpsError(
+            'failed-precondition',
+            'Could not extract math content from the image for caption generation.'
+          );
+        }
+
+        // Step 2: Generate multiple caption options using OpenAI
+        const captionPrompt = buildCaptionPrompt(
+          imageAnalysis, 
+          captionStyle, 
+          gradeLevel,
+          includeHashtags,
+          includeEmojis
+        );
+
+        const openai = getOpenAIClient();
+        const response = await openai.chat.completions.create({
+          model: 'gpt-4o',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a creative social media caption generator for math students. Generate engaging, positive captions that celebrate learning achievements.'
+            },
+            {
+              role: 'user',
+              content: captionPrompt
+            }
+          ],
+          max_tokens: 500,
+          temperature: 0.8, // Higher temperature for more creative captions
+        });
+
+        const captionText = response.choices[0]?.message?.content;
+        if (!captionText) {
+          throw new functions.https.HttpsError(
+            'internal',
+            'Failed to generate caption content'
+          );
+        }
+
+        // Parse the response to extract multiple captions
+        const captions = parseCaptionResponse(captionText);
+        
+        // Extract detected concepts and difficulty
+        const detectedConcepts = extractMathConcepts(imageAnalysis.extractedText);
+        const difficulty = determineDifficulty(imageAnalysis, gradeLevel);
+
+        const result: SmartCaptionResponse = {
+          captions,
+          detectedConcepts,
+          difficulty,
+          processingTime: Date.now() - startTime
+        };
+
+        return result;
+
+      } catch (error) {
+        functions.logger.error('Error in generateSmartCaption:', error);
+        
+        if (error instanceof functions.https.HttpsError) {
+          throw error;
+        }
+
+        throw new functions.https.HttpsError(
+          'internal',
+          'An error occurred while generating smart captions',
+          { originalError: error instanceof Error ? error.message : String(error) }
+        );
+      }
+    }
+  );
+
+/**
+ * Build caption generation prompt based on image analysis and preferences
+ */
+function buildCaptionPrompt(
+  imageAnalysis: ImageAnalysisResult, 
+  style: string, 
+  gradeLevel?: string,
+  includeHashtags: boolean = true,
+  includeEmojis: boolean = true
+): string {
+  const mathContent = imageAnalysis.extractedText;
+  const concepts = imageAnalysis.mathProblems.map(p => p.type).filter(type => type !== 'unknown');
+  
+  let styleDescription = '';
+  switch (style) {
+    case 'celebratory':
+      styleDescription = 'celebratory and triumphant, showing pride in completing the work';
+      break;
+    case 'educational':
+      styleDescription = 'educational and informative, highlighting what was learned';
+      break;
+    case 'motivational':
+      styleDescription = 'motivational and inspiring, encouraging others to keep learning';
+      break;
+    default:
+      styleDescription = 'casual and relatable, like a student sharing with friends';
+  }
+
+  return `
+Generate 3 different social media captions for a student who just completed this math work:
+
+Math Content: "${mathContent}"
+Detected Concepts: ${concepts.join(', ')}
+Grade Level: ${gradeLevel || 'Not specified'}
+Caption Style: ${styleDescription}
+
+Requirements:
+- Each caption should be unique and engaging
+- ${includeEmojis ? 'Include relevant emojis (📐📊🧮🎯✨💪🔥📚)' : 'Do not include emojis'}
+- ${includeHashtags ? 'Include 2-3 relevant hashtags like #MathWhiz #StudyLife #MathWins #LearningJourney #MathSuccess' : 'Do not include hashtags'}
+- Keep each caption under 280 characters
+- Make them sound authentic and age-appropriate
+- Celebrate the achievement without giving away answers
+- Be positive and encouraging
+
+Format your response as:
+1. [First caption]
+2. [Second caption]  
+3. [Third caption]
+`;
+}
+
+/**
+ * Parse caption response from OpenAI into array of captions
+ */
+function parseCaptionResponse(response: string): string[] {
+  const lines = response.split('\n').filter(line => line.trim().length > 0);
+  const captions: string[] = [];
+  
+  for (const line of lines) {
+    // Look for numbered lines (1. 2. 3.) or bullet points
+    const match = line.match(/^[0-9]+\.\s*(.+)$/) || line.match(/^[-•]\s*(.+)$/);
+    if (match) {
+      captions.push(match[1].trim());
+    }
+  }
+  
+  // Fallback: if no numbered format found, split by sentences
+  if (captions.length === 0) {
+    const sentences = response.split(/[.!?]+/).filter(s => s.trim().length > 10);
+    return sentences.slice(0, 3).map(s => s.trim());
+  }
+  
+  return captions.slice(0, 3); // Return max 3 captions
+}
+
+/**
+ * Extract math concepts from text
+ */
+function extractMathConcepts(text: string): string[] {
+  const concepts: string[] = [];
+  const mathTerms = [
+    'algebra', 'geometry', 'calculus', 'trigonometry', 'statistics',
+    'equation', 'function', 'derivative', 'integral', 'limit',
+    'polynomial', 'quadratic', 'linear', 'exponential', 'logarithm',
+    'triangle', 'circle', 'rectangle', 'square', 'angle',
+    'fraction', 'decimal', 'percentage', 'ratio', 'proportion'
+  ];
+  
+  const lowerText = text.toLowerCase();
+  for (const term of mathTerms) {
+    if (lowerText.includes(term)) {
+      concepts.push(term);
+    }
+  }
+  
+  return [...new Set(concepts)]; // Remove duplicates
+}
+
+/**
+ * Determine difficulty level based on image analysis
+ */
+function determineDifficulty(imageAnalysis: ImageAnalysisResult, gradeLevel?: string): 'easy' | 'medium' | 'hard' {
+  const text = imageAnalysis.extractedText.toLowerCase();
+  
+  // Check for advanced concepts
+  if (text.includes('derivative') || text.includes('integral') || text.includes('limit')) {
+    return 'hard';
+  }
+  
+  // Check for intermediate concepts
+  if (text.includes('quadratic') || text.includes('trigonometry') || text.includes('logarithm')) {
+    return 'medium';
+  }
+  
+  // Check grade level
+  if (gradeLevel) {
+    const grade = parseInt(gradeLevel);
+    if (grade >= 11) return 'hard';
+    if (grade >= 8) return 'medium';
+  }
+  
+  return 'easy';
+} 

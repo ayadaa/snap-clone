@@ -90,6 +90,27 @@ export interface ExtendedRagResponse extends RagResponse {
 }
 
 /**
+ * Interface for smart caption generation requests
+ */
+export interface SmartCaptionRequest {
+  imageUrl: string;
+  gradeLevel?: string;
+  captionStyle?: 'casual' | 'celebratory' | 'educational' | 'motivational';
+  includeHashtags?: boolean;
+  includeEmojis?: boolean;
+}
+
+/**
+ * Interface for smart caption response
+ */
+export interface SmartCaptionResponse {
+  captions: string[];
+  detectedConcepts: string[];
+  difficulty: 'easy' | 'medium' | 'hard';
+  processingTime: number;
+}
+
+/**
  * Get definition for a math term
  * 
  * @param request - Definition request parameters
@@ -243,4 +264,39 @@ export function isValidGradeLevel(gradeLevel: string): boolean {
   ];
   
   return validGrades.includes(gradeLevel.toLowerCase());
+}
+
+/**
+ * Generate smart captions for math Snaps
+ * 
+ * This function calls the generateSmartCaption Cloud Function to create
+ * engaging, educational captions for students sharing their math work.
+ * 
+ * @param request - Smart caption generation request
+ * @returns Promise resolving to smart caption response
+ */
+export async function generateSmartCaption(
+  request: SmartCaptionRequest
+): Promise<SmartCaptionResponse> {
+  try {
+    console.log('🎨 Generating smart caption for image:', request.imageUrl.substring(0, 50) + '...');
+    
+    const generateSmartCaptionFunction = httpsCallable<SmartCaptionRequest, SmartCaptionResponse>(
+      functions, 
+      'generateSmartCaption'
+    );
+    
+    const result = await generateSmartCaptionFunction(request);
+    
+    console.log('✅ Smart caption generated successfully:', {
+      captionsCount: result.data.captions.length,
+      difficulty: result.data.difficulty,
+      processingTime: result.data.processingTime
+    });
+    
+    return result.data;
+  } catch (error) {
+    console.error('❌ Error generating smart caption:', error);
+    throw new Error('Failed to generate smart caption. Please try again.');
+  }
 } 

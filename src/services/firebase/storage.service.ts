@@ -131,4 +131,36 @@ export async function getSnapURL(storagePath: string): Promise<string> {
     console.error('Error getting snap URL:', error);
     throw new Error('Failed to get snap URL');
   }
+}
+
+/**
+ * Upload any image to Firebase Storage and get public URL
+ * @param uri - Local file URI
+ * @param filename - Custom filename/path for storage
+ * @returns Promise with public download URL
+ */
+export async function uploadImageToStorage(
+  uri: string,
+  filename: string
+): Promise<string> {
+  try {
+    // Create storage reference
+    const storageRef = ref(storage, filename);
+    
+    // Convert URI to blob
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    
+    // Upload the blob
+    await uploadBytes(storageRef, blob);
+    
+    // Get the public download URL
+    const downloadURL = await getDownloadURL(storageRef);
+    
+    console.log('Image uploaded successfully:', filename);
+    return downloadURL;
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    throw new Error('Failed to upload image to storage');
+  }
 } 
