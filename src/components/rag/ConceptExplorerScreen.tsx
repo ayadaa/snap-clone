@@ -87,84 +87,103 @@ const POPULAR_CONCEPTS = [
 /**
  * Generate practice problems based on concept and grade level
  */
-function generatePracticeProblems(concept: string, gradeLevel: string): string {
-  const problems: Record<string, Record<string, string[]>> = {
-    'pythagorean theorem': {
-      '9th': ['Find the hypotenuse of a right triangle with legs 3 and 4.', 'A right triangle has legs of 5 and 12. What is the hypotenuse?'],
-      '10th': ['A ladder 13 feet long leans against a wall. The base is 5 feet from the wall. How high up the wall does it reach?', 'Find the missing side of a right triangle with hypotenuse 25 and one leg 15.'],
-      '11th': ['In a coordinate plane, find the distance between points (3,4) and (7,1).', 'A rectangular field is 40m by 30m. What is the diagonal distance?']
+function generatePracticeProblems(concept: string, gradeLevel: string): { problem: string; solution: string } {
+  // Enhanced problem generation with randomization to create variety
+  const problemGenerators = {
+    'pythagorean theorem': (grade: string) => {
+      const leg1 = 3 + Math.floor(Math.random() * 15);
+      const leg2 = 4 + Math.floor(Math.random() * 12);
+      const scenarios = [
+        {
+          problem: `A right triangle has legs of ${leg1} and ${leg2}. Find the hypotenuse.`,
+          solution: `Solution:\n1. Use the Pythagorean theorem: a² + b² = c²\n2. Substitute: ${leg1}² + ${leg2}² = c²\n3. Calculate: ${leg1 * leg1} + ${leg2 * leg2} = c²\n4. Add: ${leg1 * leg1 + leg2 * leg2} = c²\n5. Take square root: c = ${Math.sqrt(leg1 * leg1 + leg2 * leg2).toFixed(2)}`
+        },
+        {
+          problem: `A ladder ${leg1 + leg2} feet long leans against a wall. The base is ${leg1} feet from the wall. How high up the wall does it reach?`,
+          solution: `Solution:\n1. This forms a right triangle\n2. Ladder = hypotenuse = ${leg1 + leg2} ft\n3. Base = one leg = ${leg1} ft\n4. Height = other leg = ?\n5. Use: ${leg1}² + h² = ${leg1 + leg2}²\n6. Calculate: ${leg1 * leg1} + h² = ${(leg1 + leg2) * (leg1 + leg2)}\n7. Solve: h² = ${(leg1 + leg2) * (leg1 + leg2) - leg1 * leg1}\n8. Therefore: h = ${Math.sqrt((leg1 + leg2) * (leg1 + leg2) - leg1 * leg1).toFixed(2)} ft`
+        }
+      ];
+      return scenarios[Math.floor(Math.random() * scenarios.length)];
     },
-    'quadratic equations': {
-      '8th': ['Solve: x² = 25', 'Find x when x² - 9 = 0'],
-      '9th': ['Solve: x² + 5x + 6 = 0', 'Factor: x² - 7x + 12 = 0'],
-      '10th': ['Solve using the quadratic formula: 2x² + 3x - 2 = 0', 'Find the vertex of y = x² - 4x + 3']
+    
+    'quadratic equations': (grade: string) => {
+      const a = 1 + Math.floor(Math.random() * 3);
+      const b = (Math.random() > 0.5 ? 1 : -1) * (2 + Math.floor(Math.random() * 6));
+      const c = (Math.random() > 0.5 ? 1 : -1) * (1 + Math.floor(Math.random() * 8));
+      const problems = [
+        {
+          problem: `Solve: ${a}x² ${b >= 0 ? '+' : ''}${b}x ${c >= 0 ? '+' : ''}${c} = 0`,
+          solution: `Solution:\n1. Use the quadratic formula: x = [-b ± √(b² - 4ac)] / 2a\n2. Identify: a = ${a}, b = ${b}, c = ${c}\n3. Substitute: x = [${-b} ± √(${b}² - 4(${a})(${c}))] / 2(${a})\n4. Calculate discriminant: ${b * b - 4 * a * c}\n5. Solve for x using the quadratic formula`
+        },
+        {
+          problem: `Factor: x² ${b >= 0 ? '+' : ''}${b}x ${c >= 0 ? '+' : ''}${c} = 0`,
+          solution: `Solution:\n1. Look for two numbers that multiply to ${c} and add to ${b}\n2. Factor the expression\n3. Set each factor equal to zero\n4. Solve for x`
+        }
+      ];
+      return problems[Math.floor(Math.random() * problems.length)];
     },
-    'derivatives': {
-      '11th': ['Find the derivative of f(x) = 3x²', 'What is the slope of y = x³ at x = 2?'],
-      '12th': ['Find f\'(x) for f(x) = 2x³ - 5x² + 3x - 1', 'Use the product rule to find the derivative of (x² + 1)(x - 3)']
+    
+    'derivatives': (grade: string) => {
+      const coeff = 1 + Math.floor(Math.random() * 5);
+      const power = 2 + Math.floor(Math.random() * 3);
+      const linear = (Math.random() > 0.5 ? 1 : -1) * (1 + Math.floor(Math.random() * 10));
+      const problems = [
+        {
+          problem: `Find the derivative of f(x) = ${coeff}x^${power} ${linear >= 0 ? '+' : ''}${linear}x`,
+          solution: `Solution:\n1. Use the power rule: d/dx[x^n] = n·x^(n-1)\n2. For ${coeff}x^${power}: ${coeff} · ${power} · x^${power-1} = ${coeff * power}x^${power-1}\n3. For ${linear}x: ${linear} · 1 · x^0 = ${linear}\n4. Combine: f'(x) = ${coeff * power}x^${power-1} ${linear >= 0 ? '+' : ''}${linear}`
+        },
+        {
+          problem: `What is the slope of y = ${coeff}x^${power} at x = 2?`,
+          solution: `Solution:\n1. Find the derivative: y' = ${coeff * power}x^${power-1}\n2. Substitute x = 2: y'(2) = ${coeff * power}(2)^${power-1}\n3. Calculate: y'(2) = ${coeff * power * Math.pow(2, power-1)}\n4. The slope at x = 2 is ${coeff * power * Math.pow(2, power-1)}`
+        }
+      ];
+      return problems[Math.floor(Math.random() * problems.length)];
     }
   };
-  
+
   const conceptKey = concept.toLowerCase();
-  const gradeKey = gradeLevel.toLowerCase();
-  
-  if (problems[conceptKey] && problems[conceptKey][gradeKey]) {
-    const conceptProblems = problems[conceptKey][gradeKey];
-    return conceptProblems[Math.floor(Math.random() * conceptProblems.length)];
+  if (problemGenerators[conceptKey as keyof typeof problemGenerators]) {
+    return problemGenerators[conceptKey as keyof typeof problemGenerators](gradeLevel);
   }
-  
-  return `Practice problem for ${concept} (${gradeLevel} level):\n\nSolve a problem involving ${concept}. Use the concepts you just learned to work through this step by step.`;
+
+  // Enhanced fallback for other concepts
+  const enhancedFallbacks = {
+    'fractions': {
+      problem: `Sarah ate ${1 + Math.floor(Math.random() * 3)}/${2 + Math.floor(Math.random() * 6)} of a pizza and Tom ate ${1 + Math.floor(Math.random() * 2)}/${3 + Math.floor(Math.random() * 5)} of the same pizza. How much pizza did they eat together?`,
+      solution: 'Solution:\n1. Find a common denominator\n2. Convert both fractions\n3. Add the numerators\n4. Simplify if possible'
+    },
+    'algebra': {
+      problem: `Solve for x: ${2 + Math.floor(Math.random() * 5)}x + ${1 + Math.floor(Math.random() * 8)} = ${10 + Math.floor(Math.random() * 15)}`,
+      solution: 'Solution:\n1. Subtract the constant from both sides\n2. Divide both sides by the coefficient of x\n3. Simplify to find x'
+    }
+  };
+
+  if (enhancedFallbacks[conceptKey as keyof typeof enhancedFallbacks]) {
+    return enhancedFallbacks[conceptKey as keyof typeof enhancedFallbacks];
+  }
+
+  return {
+    problem: `Create a ${concept} problem using the concepts you've learned. Apply the principles at a ${gradeLevel} level with specific numbers and clear objectives.`,
+    solution: `Break down the problem step by step:\n1. Identify what's given\n2. Determine what to find\n3. Choose the right formula/method\n4. Substitute and calculate\n5. Check your answer`
+  };
 }
 
 /**
- * Show detailed solution for a concept
+ * Show detailed solution for a specific problem
  */
-function showSolution(concept: string, gradeLevel: string, problem?: string): void {
-  const solutions: Record<string, Record<string, string[]>> = {
-    'pythagorean theorem': {
-      '9th': [
-        'Problem: Find the hypotenuse of a right triangle with legs 3 and 4.\n\nSolution:\n1. Use the Pythagorean theorem: a² + b² = c²\n2. Substitute: 3² + 4² = c²\n3. Calculate: 9 + 16 = c²\n4. Simplify: 25 = c²\n5. Take the square root: c = 5\n\nAnswer: The hypotenuse is 5 units.',
-        'Problem: A right triangle has legs of 5 and 12. What is the hypotenuse?\n\nSolution:\n1. Apply a² + b² = c²\n2. Substitute: 5² + 12² = c²\n3. Calculate: 25 + 144 = c²\n4. Simplify: 169 = c²\n5. Take square root: c = 13\n\nAnswer: The hypotenuse is 13 units.'
-      ],
-      '10th': [
-        'Problem: A ladder 13 feet long leans against a wall. The base is 5 feet from the wall. How high up the wall does it reach?\n\nSolution:\n1. This forms a right triangle\n2. Ladder = hypotenuse = 13 ft\n3. Base = one leg = 5 ft\n4. Height = other leg = ?\n5. Use: 5² + h² = 13²\n6. Calculate: 25 + h² = 169\n7. Solve: h² = 144\n8. Therefore: h = 12 ft\n\nAnswer: The ladder reaches 12 feet up the wall.'
-      ]
-    },
-    'quadratic equations': {
-      '9th': [
-        'Problem: Solve x² + 5x + 6 = 0\n\nSolution:\n1. Factor the quadratic\n2. Find two numbers that multiply to 6 and add to 5\n3. Those numbers are 2 and 3\n4. Factor: (x + 2)(x + 3) = 0\n5. Set each factor to zero:\n   x + 2 = 0  →  x = -2\n   x + 3 = 0  →  x = -3\n\nAnswer: x = -2 or x = -3'
-      ],
-      '10th': [
-        'Problem: Solve 2x² + 3x - 2 = 0 using the quadratic formula\n\nSolution:\n1. Identify: a = 2, b = 3, c = -2\n2. Use formula: x = [-b ± √(b² - 4ac)] / 2a\n3. Substitute: x = [-3 ± √(9 - 4(2)(-2))] / 4\n4. Simplify: x = [-3 ± √(9 + 16)] / 4\n5. Calculate: x = [-3 ± √25] / 4\n6. Solve: x = [-3 ± 5] / 4\n7. Two solutions: x = 2/4 = 1/2 or x = -8/4 = -2\n\nAnswer: x = 1/2 or x = -2'
-      ]
-    },
-    'derivatives': {
-      '11th': [
-        'Problem: Find the derivative of f(x) = 3x²\n\nSolution:\n1. Use the power rule: d/dx[xⁿ] = n·xⁿ⁻¹\n2. For 3x²: coefficient stays, power comes down\n3. Apply rule: d/dx[3x²] = 3 · 2 · x²⁻¹\n4. Simplify: f\'(x) = 6x¹ = 6x\n\nAnswer: f\'(x) = 6x'
-      ],
-      '12th': [
-        'Problem: Find f\'(x) for f(x) = 2x³ - 5x² + 3x - 1\n\nSolution:\n1. Differentiate each term separately\n2. For 2x³: 3 · 2 · x² = 6x²\n3. For -5x²: 2 · (-5) · x¹ = -10x\n4. For 3x: 1 · 3 · x⁰ = 3\n5. For -1: derivative of constant = 0\n6. Combine: f\'(x) = 6x² - 10x + 3\n\nAnswer: f\'(x) = 6x² - 10x + 3'
-      ]
-    }
-  };
-
-  const conceptKey = concept.toLowerCase();
-  const gradeKey = gradeLevel.toLowerCase();
-  
-  let solutionText = '';
-  if (solutions[conceptKey] && solutions[conceptKey][gradeKey]) {
-    const conceptSolutions = solutions[conceptKey][gradeKey];
-    solutionText = conceptSolutions[Math.floor(Math.random() * conceptSolutions.length)];
-  } else {
-    solutionText = `Solution approach for ${concept}:\n\n1. Read the problem carefully\n2. Identify the given information\n3. Determine what you need to find\n4. Choose the appropriate formula or method\n5. Substitute values and solve step by step\n6. Check your answer makes sense\n\nFor more specific help, try exploring the concept first or ask your teacher.`;
-  }
-
+function showSolution(problem: string, solution: string, concept?: string, gradeLevel?: string): void {
   Alert.alert(
     'Step-by-Step Solution',
-    solutionText,
+    `Problem: ${problem}\n\nSolution:\n${solution}`,
     [
-      { text: 'New Problem', onPress: () => generateNewProblem(concept, gradeLevel) },
-      { text: 'Explore Related', onPress: () => exploreRelatedConcepts(concept) },
+      { 
+        text: 'Generate New Problem', 
+        onPress: () => {
+          if (concept && gradeLevel) {
+            generateNewProblem(concept, gradeLevel);
+          }
+        }
+      },
       { text: 'Close', style: 'cancel' }
     ]
   );
@@ -174,12 +193,12 @@ function showSolution(concept: string, gradeLevel: string, problem?: string): vo
  * Generate a new practice problem
  */
 function generateNewProblem(concept: string, gradeLevel: string): void {
-  const newProblem = generatePracticeProblems(concept, gradeLevel);
+  const problemData = generatePracticeProblems(concept, gradeLevel);
   Alert.alert(
     'New Practice Problem',
-    newProblem,
+    problemData.problem,
     [
-      { text: 'Show Solution', onPress: () => showSolution(concept, gradeLevel) },
+      { text: 'Show Solution', onPress: () => showSolution(problemData.problem, problemData.solution, concept, gradeLevel) },
       { text: 'Another Problem', onPress: () => generateNewProblem(concept, gradeLevel) },
       { text: 'Close', style: 'cancel' }
     ]
@@ -438,13 +457,13 @@ export const ConceptExplorerScreen: React.FC = () => {
                   onPress={() => {
                     if (action.type === 'practice_problem') {
                       // Generate a practice problem based on the concept
-                      const practiceProblems = generatePracticeProblems(concept, gradeLevel);
+                      const problemData = generatePracticeProblems(concept, gradeLevel);
                       Alert.alert(
                         'Practice Problem',
-                        practiceProblems,
-                        [
-                          { text: 'Show Solution', onPress: () => showSolution(concept, gradeLevel) },
-                          { text: 'Challenge Friend', onPress: () => handleChallengeFromProblem(practiceProblems, concept, gradeLevel) },
+                        problemData.problem,
+                                                  [
+                          { text: 'Show Solution', onPress: () => showSolution(problemData.problem, problemData.solution, concept, gradeLevel) },
+                          { text: 'Challenge Friend', onPress: () => handleChallengeFromProblem(problemData.problem, concept, gradeLevel) },
                           { text: 'New Problem', onPress: () => generateNewProblem(concept, gradeLevel) },
                           { text: 'Close', style: 'cancel' }
                         ]

@@ -640,6 +640,7 @@ export async function getFriendsActiveStories(userId: string): Promise<(Story & 
 export async function getUserActiveStory(userId: string): Promise<Story | null> {
   try {
     const now = Timestamp.now();
+    
     const storiesQuery = query(
       collection(db, 'stories'),
       where('userId', '==', userId),
@@ -654,9 +655,15 @@ export async function getUserActiveStory(userId: string): Promise<Story | null> 
     }
     
     const storyDoc = storiesSnapshot.docs[0];
-    return { id: storyDoc.id, ...storyDoc.data() } as Story;
+    const storyData = { id: storyDoc.id, ...storyDoc.data() } as Story;
+    
+    return storyData;
   } catch (error) {
-    console.error('Get user active story error:', error);
+    console.error('❌ Get user active story error:', error);
+    console.error('❌ Error details:', {
+      message: error instanceof Error ? error.message : String(error),
+      code: error instanceof Error && 'code' in error ? error.code : 'unknown'
+    });
     throw new Error('Failed to get user active story');
   }
 }

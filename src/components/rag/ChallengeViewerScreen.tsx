@@ -1,11 +1,11 @@
 /**
  * ChallengeViewerScreen Component
  * 
- * Displays daily math challenges with submission interface, progress tracking,
- * and AI-powered feedback. Handles both text and image answer submissions.
+ * Displays math challenges with submission interface, progress tracking,
+ * and AI-powered feedback. Handles both daily challenges and received challenge snaps.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -23,13 +23,41 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useDailyChallenge } from '../../hooks/challenges/use-daily-challenge';
+import { useMathChallenges } from '../../hooks/math/use-math-challenges';
+import { getUserProfile } from '../../services/firebase/firestore.service';
 
 interface ChallengeViewerScreenProps {
   navigation: any;
-  route?: any;
+  route?: {
+    params?: {
+      challengeSnapId?: string;
+      senderId?: string;
+    };
+  };
 }
 
 export function ChallengeViewerScreen({ navigation, route }: ChallengeViewerScreenProps) {
+  // Get route parameters
+  const challengeSnapId = route?.params?.challengeSnapId;
+  const senderId = route?.params?.senderId;
+  
+  // Determine if this is a daily challenge or a received challenge
+  const isDailyChallenge = !challengeSnapId;
+
+  // Hooks for different challenge types
+  const dailyChallengeHook = useDailyChallenge();
+  const mathChallengesHook = useMathChallenges();
+  
+  // State for received challenges
+  const [receivedChallenge, setReceivedChallenge] = useState<any>(null);
+  const [isLoadingReceived, setIsLoadingReceived] = useState(false);
+  const [receivedError, setReceivedError] = useState<string | null>(null);
+  const [senderUsername, setSenderUsername] = useState<string | null>(null);
+
+  const [answer, setAnswer] = useState('');
+  const [showHint, setShowHint] = useState(false);
+
+  // Use appropriate hook based on challenge type
   const {
     challenge,
     stats,
@@ -41,14 +69,99 @@ export function ChallengeViewerScreen({ navigation, route }: ChallengeViewerScre
     loadChallenge,
     submitChallengeAnswer,
     clearError,
-  } = useDailyChallenge();
+  } = isDailyChallenge ? dailyChallengeHook : {
+    challenge: receivedChallenge?.challenge,
+    stats: null,
+    isLoading: isLoadingReceived,
+    error: receivedError,
+    isSubmitting: false,
+    hasSubmitted: false,
+    lastResult: null,
+    loadChallenge: async () => {},
+    submitChallengeAnswer: async (answer: string, type: string) => {
+      if (challengeSnapId) {
+        return await mathChallengesHook.submitAnswer(challengeSnapId, answer);
+      }
+      throw new Error('No challenge snap ID');
+    },
+    clearError: () => setReceivedError(null),
+  };
 
-  const [answer, setAnswer] = useState('');
-  const [showHint, setShowHint] = useState(false);
-
+  // Load challenge based on type
   useEffect(() => {
-    loadChallenge();
-  }, [loadChallenge]);
+    console.log('🔄 useEffect triggered:', { isDailyChallenge, challengeSnapId });
+    
+    if (isDailyChallenge) {
+      console.log('📅 Loading daily challenge...');
+      loadChallenge();
+    } else if (challengeSnapId) {
+      console.log('🎯 Loading received challenge...');
+      
+      // Load received challenge inline to avoid dependency issues
+      const loadReceivedChallenge = async () => {
+        console.log('🔍 Loading received challenge with ID:', challengeSnapId);
+        setIsLoadingReceived(true);
+        setReceivedError(null);
+        
+        try {
+          console.log('📞 Calling mathChallengesHook.viewChallenge...');
+          const result = await mathChallengesHook.viewChallenge(challengeSnapId);
+          console.log('📦 viewChallenge result:', result);
+          
+          if (result) {
+            console.log('✅ Setting received challenge data:', result);
+            setReceivedChallenge(result);
+            
+            // Fetch sender's username
+            if (result.challengeSnap?.senderId) {
+              try {
+                const senderProfile = await getUserProfile(result.challengeSnap.senderId);
+                setSenderUsername(senderProfile?.username || null);
+              } catch (error) {
+                console.log('Failed to fetch sender profile:', error);
+              }
+            }
+          } else {
+            console.log('❌ No result from viewChallenge');
+            setReceivedError('Challenge not found');
+          }
+        } catch (error) {
+          console.log('💥 Error in loadReceivedChallenge:', error);
+          setReceivedError(error instanceof Error ? error.message : 'Failed to load challenge');
+        } finally {
+          console.log('🏁 Setting isLoadingReceived to false');
+          setIsLoadingReceived(false);
+        }
+      };
+      
+      loadReceivedChallenge();
+    } else {
+      console.log('⚠️ No challenge type determined');
+    }
+  }, [isDailyChallenge, challengeSnapId]); // Removed problematic dependencies
+
+  /**
+   * Reload received challenge (for retry/refresh buttons)
+   */
+  const reloadReceivedChallenge = useCallback(async () => {
+    if (!challengeSnapId) return;
+    
+    setIsLoadingReceived(true);
+    setReceivedError(null);
+    
+    try {
+      const result = await mathChallengesHook.viewChallenge(challengeSnapId);
+      if (result) {
+        setReceivedChallenge(result);
+      } else {
+        setReceivedError('Challenge not found');
+      }
+    } catch (error) {
+      setReceivedError(error instanceof Error ? error.message : 'Failed to load challenge');
+    } finally {
+      setIsLoadingReceived(false);
+    }
+  }, [challengeSnapId, mathChallengesHook]);
 
   const handleSubmit = async () => {
     if (!answer.trim()) {
@@ -57,8 +170,19 @@ export function ChallengeViewerScreen({ navigation, route }: ChallengeViewerScre
     }
 
     try {
-      await submitChallengeAnswer(answer, 'text');
+      const result = await submitChallengeAnswer(answer, 'text');
       setAnswer('');
+      
+      // For received challenges, automatically close after submission
+      if (!isDailyChallenge) {
+        // Small delay to let the user see the success alert from the hook
+        setTimeout(() => {
+          navigation.goBack();
+        }, 2000);
+      }
+      
+      // Note: The result alert is already shown by the math challenges hook
+      // so we don't need to show another one here
     } catch (error) {
       Alert.alert('Submission Error', 'Failed to submit your answer. Please try again.');
     }
@@ -95,7 +219,7 @@ export function ChallengeViewerScreen({ navigation, route }: ChallengeViewerScre
 
     const shareMessage = `Snap Factor Daily Challenge ${today}
 
-${scoreEmoji} Score: ${score}/${challenge.points} points
+${scoreEmoji} Score: ${score}/${challenge.points || 100} points
 ${streakEmoji} Streak: ${currentStreak} days
 📊 Total: ${totalPoints} points
 
@@ -145,7 +269,7 @@ Challenge yourself at Snap Factor! 🧮✨`;
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>
-            Daily Challenge Complete!
+            {isDailyChallenge ? 'Daily Challenge Complete!' : 'Challenge Complete!'}
           </Text>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
@@ -244,22 +368,24 @@ Challenge yourself at Snap Factor! 🧮✨`;
     );
   }
 
-  // Loading State
-  if (isLoading) {
+  // Loading State - check both daily challenge loading and received challenge loading
+  if (isLoading || isLoadingReceived) {
+    console.log('🔄 Showing loading screen:', { isLoading, isLoadingReceived, isDailyChallenge, challengeSnapId });
+    
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color="#3B82F6" />
           <Text style={styles.loadingText}>
-            Loading today's challenge...
+            {isDailyChallenge ? "Loading today's challenge..." : "Loading challenge..."}
           </Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  // Error State
-  if (error) {
+  // Error State - check both error sources
+  if (receivedError || error) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.centerContent}>
@@ -268,13 +394,20 @@ Challenge yourself at Snap Factor! 🧮✨`;
             Oops! Something went wrong
           </Text>
           <Text style={styles.errorText}>
-            {error}
+            {receivedError || error}
           </Text>
 
           <TouchableOpacity
             onPress={() => {
               clearError();
-              loadChallenge();
+              if (receivedError) {
+                setReceivedError(null);
+              }
+              if (isDailyChallenge) {
+                loadChallenge();
+              } else {
+                reloadReceivedChallenge();
+              }
             }}
             style={styles.retryButton}
           >
@@ -285,7 +418,7 @@ Challenge yourself at Snap Factor! 🧮✨`;
     );
   }
 
-  // No Challenge State
+  // No Challenge State - check both challenge sources
   if (!challenge) {
     return (
       <SafeAreaView style={styles.container}>
@@ -299,7 +432,7 @@ Challenge yourself at Snap Factor! 🧮✨`;
           </Text>
 
           <TouchableOpacity
-            onPress={loadChallenge}
+            onPress={isDailyChallenge ? loadChallenge : reloadReceivedChallenge}
             style={styles.refreshButton}
           >
             <Text style={styles.refreshButtonText}>Refresh</Text>
@@ -344,13 +477,13 @@ Challenge yourself at Snap Factor! 🧮✨`;
         <View style={styles.challengeHeader}>
           <View style={styles.challengeHeaderContent}>
             <Text style={styles.challengeTitle}>
-              Daily Challenge
+              {isDailyChallenge ? 'Daily Challenge' : `Math Challenge from ${senderUsername || 'Friend'}`}
             </Text>
             <Text style={styles.challengeGrade}>
-              {challenge.gradeLevel} • {challenge.points} points
+              {challenge.gradeLevel} • {isDailyChallenge && challenge.points ? `${challenge.points} points` : challenge.concept}
             </Text>
 
-            {stats && (
+            {stats && isDailyChallenge && (
               <View style={styles.streakContainer}>
                 <Text style={styles.streakNumber}>
                   {stats.currentStreak}
@@ -365,7 +498,9 @@ Challenge yourself at Snap Factor! 🧮✨`;
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           <View style={styles.challengeContent}>
             <View style={styles.problemContainer}>
-              <Text style={styles.problemTitle}>Today's Problem</Text>
+              <Text style={styles.problemTitle}>
+                {isDailyChallenge ? "Today's Problem" : "Challenge Problem"}
+              </Text>
               <Text style={styles.problemText}>
                 {challenge.problem}
               </Text>
