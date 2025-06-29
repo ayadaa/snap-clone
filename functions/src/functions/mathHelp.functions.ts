@@ -137,6 +137,28 @@ interface ChallengeSubmissionResponse {
 }
 
 /**
+ * Visual Generation Interfaces
+ */
+interface VisualGenerationRequest {
+  concept: string;
+  gradeLevel?: string;
+  visualType?: 'diagram' | 'graph' | 'chart' | 'geometric' | 'auto';
+  style?: 'simple' | 'detailed' | 'interactive';
+}
+
+interface VisualGenerationResponse {
+  success: boolean;
+  visual?: {
+    type: 'svg' | 'html' | 'description';
+    content: string;
+    title: string;
+    description: string;
+    interactiveElements?: string[];
+  };
+  error?: string;
+}
+
+/**
  * Helper function to check authentication
  */
 function checkAuth(context: functions.https.CallableContext, operation: string): void {
@@ -1320,6 +1342,241 @@ export const getDailyChallenge = functions
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to get daily challenge'
+      };
+    }
+  });
+
+/**
+ * Generate Visual Representation
+ * Creates visual representations for mathematical concepts
+ */
+export const generateVisualRepresentation = functions
+  .runWith({
+    secrets: [openaiApiKey, pineconeApiKey]
+  })
+  .https
+  .onCall(async (data: VisualGenerationRequest, context): Promise<VisualGenerationResponse> => {
+    try {
+      checkAuth(context, 'generate visual representations');
+
+      const { concept, gradeLevel = 'general', visualType = 'auto', style = 'simple' } = data;
+
+      if (!concept || typeof concept !== 'string') {
+        throw new functions.https.HttpsError(
+          'invalid-argument',
+          'Concept is required and must be a string'
+        );
+      }
+
+      functions.logger.info('Generating visual representation:', { concept, gradeLevel, visualType, style });
+      
+      // Log that the function was called successfully
+      functions.logger.info('Function called successfully, proceeding with OpenAI request');
+
+      const openai = getOpenAIClient();
+
+      // Create a comprehensive prompt for generating high-quality SVG visualizations
+      const visualPrompt = `You are an expert mathematics educator and graphic designer. Create a high-quality, educational SVG visualization for the concept "${concept}" suitable for ${gradeLevel} grade level.
+
+CRITICAL REQUIREMENTS:
+1. Generate COMPLETE, VALID SVG code with proper dimensions (400x300 or similar)
+2. Use EDUCATIONAL color palette: #2563eb (blue), #059669 (green), #7c3aed (purple), #dc2626 (red for highlights only)
+3. Include clear, readable text labels with appropriate font sizes (12-16px)
+4. Make it mathematically accurate and pedagogically sound
+5. Style: ${style}, Visual preference: ${visualType}
+
+CONCEPT-SPECIFIC GUIDELINES:
+
+GEOMETRY (triangles, circles, polygons, Pythagorean theorem):
+- Draw precise shapes with accurate proportions
+- Include measurement labels (sides, angles, areas)
+- Use grid backgrounds for reference
+- Show construction lines when relevant
+- Add visual proofs or demonstrations
+
+ALGEBRA (equations, functions, graphing):
+- Create coordinate systems with proper scales
+- Plot functions with smooth curves
+- Mark key points (intercepts, vertices, intersections)
+- Use different line styles (solid, dashed, dotted)
+- Include equation labels
+
+CALCULUS (derivatives, integrals, limits):
+- Draw VISIBLE function curves using <path> or <polyline> elements with stroke properties
+- Include tangent lines as separate <line> elements with distinct colors
+- Use proper coordinate transformations (origin at center or bottom-left)
+- Add clear stroke-width (2-3px) and stroke colors for all lines
+- Show specific points where derivative is calculated
+- Include numerical examples (e.g., f(x)=x², f'(2)=4)
+
+ARITHMETIC (fractions, decimals, percentages):
+- Create visual models (pie charts, bar models, number lines)
+- Use clear part-whole relationships
+- Include equivalent representations
+- Make proportions visually obvious
+
+TECHNICAL SVG REQUIREMENTS:
+- ALL lines must have stroke="color" and stroke-width="2" or higher
+- For mathematical CURVES: ALWAYS use fill="none" to prevent solid shapes
+- For mathematical FUNCTIONS: Never create filled triangles or solid shapes
+- Use viewBox="0 0 400 300" for proper scaling
+- Coordinate system: (0,0) at top-left, positive y goes down
+- For graphs: transform coordinate system so (0,0) is at graph center
+- Test that every visual element is actually visible
+
+FORBIDDEN for mathematical functions:
+- ❌ Filled paths that create solid triangles/shapes
+- ❌ Missing fill="none" on function curves
+- ❌ Coordinate systems without proper transformation
+
+ADVANCED FEATURES TO INCLUDE:
+- Proper mathematical symbols (∞, ∫, ∂, √, ±, etc.)
+- Clean typography with consistent spacing
+- Visual hierarchy (important elements stand out)
+- Subtle shadows or gradients for depth
+- Interactive visual cues (arrows, highlights)
+
+CRITICAL: For DERIVATIVES specifically, you MUST:
+1. Create a coordinate system with origin at center: <g transform='translate(200,150)'>
+2. Draw axes as LINES: <line stroke='#666' stroke-width='1' x1='-180' y1='0' x2='180' y2='0'/>
+3. Draw function curve with NO FILL: <path stroke='#2563eb' stroke-width='3' fill='none' d='...'/>
+4. Draw tangent line as separate LINE: <line stroke='#dc2626' stroke-width='2' x1='...' y1='...' x2='...' y2='...'/>
+5. Use mathematical coordinate system where y increases UPWARD (negative y values go up)
+
+EXAMPLE FOR DERIVATIVES:
+{
+  "type": "svg",
+  "content": "<svg viewBox='0 0 400 300' xmlns='http://www.w3.org/2000/svg'><rect width='400' height='300' fill='#f8fafc'/><g transform='translate(200,150)'><line stroke='#666' stroke-width='1' x1='-180' y1='0' x2='180' y2='0'/><line stroke='#666' stroke-width='1' x1='0' y1='-120' x2='0' y2='120'/><path stroke='#2563eb' stroke-width='3' fill='none' d='M-120,72 Q-60,18 0,0 Q60,18 120,72'/><line stroke='#dc2626' stroke-width='2' x1='-50' y1='0' x2='50' y2='0'/><circle fill='#059669' cx='0' cy='0' r='4'/><text font-family='Arial' font-size='12' fill='#1f2937' x='10' y='-10'>f'(0)=0</text><text font-family='Arial' font-size='10' fill='#666' x='-190' y='-5'>x</text><text font-family='Arial' font-size='10' fill='#666' x='5' y='-125'>y</text></g></svg>",
+  "title": "Derivative at a Point",
+  "description": "Shows function f(x)=x²/12 with tangent line at x=0 where slope f'(0)=0",
+  "interactiveElements": ["Parabola curve", "Tangent line at origin", "Point of tangency", "Slope calculation"]
+}
+
+EXAMPLE HIGH-QUALITY OUTPUT:
+{
+  "type": "svg",
+  "content": "<svg width='400' height='300' xmlns='http://www.w3.org/2000/svg'><defs><style>.label{font-family:Arial,sans-serif;font-size:14px;fill:#1f2937}.highlight{fill:#dc2626}.primary{fill:#2563eb}.secondary{fill:#059669}</style></defs><rect width='400' height='300' fill='#f8fafc' stroke='#e5e7eb'/>[COMPLETE SVG CONTENT HERE]</svg>",
+  "title": "Pythagorean Theorem Visualization",
+  "description": "Interactive diagram showing a² + b² = c² with visual proof using square areas",
+  "interactiveElements": ["Right triangle with sides a=3, b=4, c=5", "Three squares showing areas", "Visual equation a²+b²=c²"]
+}
+
+Generate a mathematically accurate, visually appealing SVG that would help a ${gradeLevel} student understand "${concept}".`;
+
+      const visualResponse = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert mathematics educator and graphic designer specializing in creating high-quality educational visualizations. You have deep knowledge of mathematical concepts and excellent design skills. Always create complete, valid SVG code with proper styling and educational value. Respond only with valid JSON containing complete SVG visualizations.'
+          },
+          {
+            role: 'user',
+            content: visualPrompt
+          }
+        ],
+        temperature: 0.1, // Lower temperature for more consistent, accurate results
+        max_tokens: 3000  // More tokens for detailed SVG content
+      });
+
+      const visualContent = visualResponse.choices[0]?.message?.content;
+      if (!visualContent) {
+        throw new Error('Failed to generate visual content');
+      }
+
+      functions.logger.info('OpenAI raw response:', {
+        contentLength: visualContent.length,
+        contentPreview: visualContent.substring(0, 300)
+      });
+
+      // Parse the JSON response
+      const cleanedContent = visualContent
+        .replace(/```json\s*/g, '')
+        .replace(/```\s*/g, '')
+        .trim();
+
+      functions.logger.info('Cleaned content for parsing:', {
+        cleanedLength: cleanedContent.length,
+        cleanedPreview: cleanedContent.substring(0, 200)
+      });
+
+      let visualData;
+      try {
+        visualData = JSON.parse(cleanedContent);
+      } catch (parseError) {
+        functions.logger.error('Failed to parse visual response:', { 
+          content: visualContent, 
+          cleaned: cleanedContent,
+          error: parseError 
+        });
+        throw new Error('Failed to parse visual response');
+      }
+
+      // Validate that we have SVG content with visible elements
+      if (!visualData.content || !visualData.content.includes('<svg')) {
+        throw new Error('Generated content is not valid SVG');
+      }
+
+      // Check for essential SVG elements that make content visible
+      const svgContent = visualData.content;
+      const hasVisibleElements = 
+        svgContent.includes('stroke=') || 
+        svgContent.includes('fill=') || 
+        svgContent.includes('<path') || 
+        svgContent.includes('<line') || 
+        svgContent.includes('<circle') || 
+        svgContent.includes('<rect');
+
+      if (!hasVisibleElements) {
+        functions.logger.warn('Generated SVG lacks visible elements, regenerating...');
+        throw new Error('Generated SVG lacks visible drawing elements');
+      }
+
+      // For derivatives/calculus: log what we received for debugging
+      if (concept.toLowerCase().includes('derivative') || concept.toLowerCase().includes('calculus')) {
+        functions.logger.info('Derivative SVG validation:', {
+          hasFillNone: svgContent.includes('fill="none"'),
+          hasPath: svgContent.includes('<path'),
+          hasTransform: svgContent.includes('transform='),
+          hasStroke: svgContent.includes('stroke='),
+          contentLength: svgContent.length,
+          contentPreview: svgContent.substring(0, 200)
+        });
+        
+        // More lenient validation - just ensure it has drawing elements
+        const hasDrawingElements = svgContent.includes('<path') || svgContent.includes('<line') || svgContent.includes('<polyline');
+        
+        if (!hasDrawingElements) {
+          functions.logger.warn('Mathematical function lacks drawing elements, regenerating...');
+          throw new Error('Mathematical function must contain visible drawing elements');
+        }
+      }
+
+      functions.logger.info('Visual representation generated successfully');
+
+      return {
+        success: true,
+        visual: {
+          type: visualData.type || 'svg',
+          content: visualData.content,
+          title: visualData.title || `${concept} Visualization`,
+          description: visualData.description || `Visual representation of ${concept}`,
+          interactiveElements: visualData.interactiveElements || []
+        }
+      };
+
+    } catch (error) {
+      functions.logger.error('Error generating visual representation:', {
+        error: error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack trace',
+        concept: data.concept,
+        gradeLevel: data.gradeLevel
+      });
+      
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to generate visual representation'
       };
     }
   }); 

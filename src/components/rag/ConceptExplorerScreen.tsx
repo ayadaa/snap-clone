@@ -41,6 +41,8 @@ import {
 import { formatConfidence, getConfidenceColor } from '../../services/firebase/rag.service';
 import { useMathChallenges, type CreateChallengeData } from '../../hooks/math/use-math-challenges';
 import { useFriends } from '../../hooks/friends/use-friends';
+import { useVisualGeneration } from '../../hooks/rag/use-visual-generation';
+import { VisualViewerModal } from './VisualViewerModal';
 
 const { width } = Dimensions.get('window');
 
@@ -229,30 +231,7 @@ function exploreRelatedConcepts(concept: string): void {
   );
 }
 
-/**
- * Explore visual concepts related to the main concept
- */
-function exploreVisualConcept(concept: string): void {
-  const visualSuggestions: Record<string, string> = {
-    'pythagorean theorem': 'Draw right triangles with different side lengths. Try the 3-4-5 triangle, then 5-12-13. Notice the pattern!\n\nVisual ideas:\n• Draw squares on each side to see why a² + b² = c²\n• Use graph paper to plot right triangles\n• Try the "Pythagorean proof by rearrangement"',
-    'quadratic equations': 'Graph parabolas to see how solutions relate to x-intercepts.\n\nVisual ideas:\n• Use graphing calculator or Desmos\n• Plot y = x², y = x² + 2x + 1, etc.\n• See how the vertex and roots connect\n• Try completing the square visually',
-    'derivatives': 'Visualize slopes and tangent lines on curves.\n\nVisual ideas:\n• Draw secant lines approaching tangent lines\n• Use online graphing tools like Desmos\n• Sketch f(x) and f\'(x) on the same axes\n• Try the "zooming in" approach to see limits',
-    'fractions': 'Use visual models like pie charts and number lines.\n\nVisual ideas:\n• Draw circles divided into equal parts\n• Use fraction bars or strips\n• Plot fractions on number lines\n• Try fraction multiplication with area models',
-    'geometry': 'Create physical models and accurate diagrams.\n\nVisual ideas:\n• Use compass and straightedge constructions\n• Build 3D models with cardboard\n• Use coordinate geometry on graph paper\n• Try dynamic geometry software like GeoGebra'
-  };
-  
-  const suggestion = visualSuggestions[concept.toLowerCase()] || 
-    `Create visual representations for ${concept}:\n\n• Draw diagrams and sketches\n• Use online graphing tools\n• Build physical models\n• Watch educational videos\n• Try interactive simulations`;
-  
-  Alert.alert(
-    'Visual Learning Guide',
-    suggestion,
-    [
-      { text: 'Explore Related', onPress: () => exploreRelatedConcepts(concept) },
-      { text: 'Close', style: 'cancel' }
-    ]
-  );
-}
+// Note: exploreVisualConcept function is now handled by the component's visual generation functionality
 
 /**
  * Concept Explorer Screen Component
@@ -274,6 +253,39 @@ export const ConceptExplorerScreen: React.FC = () => {
   // Challenge functionality
   const { createAndSendChallenge, isLoading: challengeLoading } = useMathChallenges();
   const { friends } = useFriends();
+
+  // Visual generation functionality
+  const { generateVisual, isLoading: visualLoading, currentVisual, clearVisual } = useVisualGeneration();
+  const [showVisualModal, setShowVisualModal] = useState(false);
+
+  /**
+   * Handle visual representation generation
+   */
+  const handleGenerateVisual = async (conceptName: string) => {
+    try {
+      console.log('🎯 handleGenerateVisual called with:', conceptName);
+      setShowVisualModal(true);
+      
+      const request = {
+        concept: conceptName,
+        gradeLevel: gradeLevel,
+        visualType: 'auto' as const,
+        style: 'detailed' as const
+      };
+      
+      console.log('📝 Visual request:', request);
+      
+      await generateVisual(request);
+      console.log('🎉 Visual generation completed successfully');
+    } catch (error) {
+      console.error('💥 Error in handleGenerateVisual:', error);
+      Alert.alert(
+        'Visual Generation Failed',
+        `Unable to generate visual representation. Please try again.\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        [{ text: 'OK', onPress: () => setShowVisualModal(false) }]
+      );
+    }
+  };
 
   /**
    * Set active mode when component mounts
@@ -469,15 +481,8 @@ export const ConceptExplorerScreen: React.FC = () => {
                         ]
                       );
                     } else if (action.type === 'visual_aid') {
-                      // Show visual representation info
-                      Alert.alert(
-                        'Visual Representation',
-                        `For ${concept}, you can visualize this concept by:\n\n• Drawing diagrams on paper\n• Using online graphing tools\n• Creating physical models\n• Watching educational videos\n\nWould you like to explore a related visual concept?`,
-                        [
-                          { text: 'Explore Related', onPress: () => exploreVisualConcept(concept) },
-                          { text: 'Close', style: 'cancel' }
-                        ]
-                      );
+                      // Directly generate visual representation
+                      handleGenerateVisual(concept);
                     } else if (action.type === 'related_concept') {
                       setConcept(action.description);
                       handleExploreConcept();
@@ -678,6 +683,18 @@ export const ConceptExplorerScreen: React.FC = () => {
         {/* Concept Response */}
         {renderConceptResponse()}
       </ScrollView>
+
+      {/* Visual Viewer Modal */}
+      <VisualViewerModal
+        visible={showVisualModal}
+        onClose={() => {
+          setShowVisualModal(false);
+          clearVisual();
+        }}
+        visual={currentVisual}
+        concept={concept}
+        isLoading={visualLoading}
+      />
     </View>
   );
 };
@@ -949,6 +966,38 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     padding: 8,
     fontStyle: 'italic',
+  },
+  actionButtonsContainer: {
+    padding: 16,
+    gap: 12,
+  },
+  primaryActionButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  primaryActionButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  secondaryActionButton: {
+    backgroundColor: '#F0F0F0',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  secondaryActionButtonText: {
+    color: '#333333',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
