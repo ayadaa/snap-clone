@@ -921,18 +921,55 @@ export const submitChallengeAnswer = functions
          }
        }
 
+      // Get the expected correct answer if available
+      const expectedAnswer = challenge.correctAnswer || null;
+      
+      // First, try simple numerical comparison if we have an expected answer
+      let isCorrectSimple = false;
+      if (expectedAnswer) {
+        // Extract numbers from both answers for comparison
+        const extractNumber = (str: string): number | null => {
+          const cleaned = str.replace(/[^\d.-]/g, '');
+          const num = parseFloat(cleaned);
+          return isNaN(num) ? null : num;
+        };
+        
+        const studentNum = extractNumber(processedAnswer);
+        const expectedNum = extractNumber(expectedAnswer);
+        
+        if (studentNum !== null && expectedNum !== null) {
+          // Allow for small floating point differences
+          isCorrectSimple = Math.abs(studentNum - expectedNum) < 0.001;
+          functions.logger.info('Simple numerical comparison:', { 
+            studentNum, 
+            expectedNum, 
+            isCorrect: isCorrectSimple 
+          });
+        }
+      }
+      
       // Evaluate answer using OpenAI
       const evaluationPrompt = `
         Math Problem: ${challenge.problem}
         Student Answer: ${processedAnswer}
+        ${expectedAnswer ? `Expected Answer: ${expectedAnswer}` : ''}
         
-        IMPORTANT: Be very generous in your evaluation. Accept equivalent answers in different formats.
-        For example:
-        - "5 weeks" = "35 days" = "5 wks" = "five weeks"
-        - "$12" = "12 dollars" = "$12.00"
-        - "1/2" = "0.5" = "50%" = "one half"
+        IMPORTANT: Be EXTREMELY generous in your evaluation. Accept equivalent answers in ANY format.
         
-        Evaluate if the student's answer is mathematically correct or equivalent to the correct answer.
+        Examples of equivalent answers:
+        - Numbers: "7", "7 marbles", "seven", "seven marbles", "7.0", "7 items"
+        - Money: "$12", "12 dollars", "$12.00", "twelve dollars"
+        - Fractions: "1/2", "0.5", "50%", "one half", "half"
+        - Units: "5 weeks" = "35 days", "2 hours" = "120 minutes"
+        - Text variations: "7 marbles" = "7" = "seven marbles" = "seven"
+        
+        Key rules:
+        1. Extract the numerical value from the student's answer
+        2. Ignore extra words like units, articles, or descriptive text
+        3. Accept any reasonable representation of the same number
+        4. Focus on mathematical correctness, not exact format matching
+        
+        Evaluate if the student's answer is mathematically correct or equivalent.
         
         Provide encouraging feedback regardless of correctness. If correct, celebrate their success!
         If incorrect, be supportive and educational.
@@ -985,7 +1022,8 @@ export const submitChallengeAnswer = functions
         });
         throw new Error('Failed to parse evaluation response');
       }
-      const isCorrect = evaluation.isCorrect;
+      // Use simple numerical comparison if it was successful, otherwise use AI evaluation
+      const isCorrect = isCorrectSimple || evaluation.isCorrect;
       
       // More generous scoring system
       let score: number;
@@ -1097,28 +1135,74 @@ async function generateNewDailyChallenge(gradeLevel: string, challengeDate: stri
     
     functions.logger.info('Generating daily challenge:', { gradeLevel, challengeType, challengeDate });
 
-    // Generate new challenge using RAG
-    const challengePrompt = `Generate a ${challengeType} math problem appropriate for ${gradeLevel} grade level. 
-    The problem should be engaging and educational, suitable for a daily challenge.
-    Include a hint that guides students without giving away the answer.
-    Format: Problem statement, followed by [HINT: helpful guidance]`;
+    // Generate new challenge using OpenAI directly for better control
+    const openai = getOpenAIClient();
+    
+    const challengePrompt = `Create a ${challengeType} math problem for ${gradeLevel} grade students.
 
-    const ragResponse = await processRagQuery({
-      query: challengePrompt,
-      queryType: 'concept_exploration',
-      gradeLevel,
-      includeExamples: true
+Requirements:
+- Age-appropriate and engaging scenario
+- Clear, concise problem statement
+- Specific numerical answer
+- Educational value
+- Fun context (sports, games, food, animals, etc.)
+
+Format your response as JSON:
+{
+  "problem": "Clear problem statement with specific question",
+  "hint": "Helpful guidance without giving away the answer",
+  "correctAnswer": "The exact numerical answer",
+  "explanation": "Brief explanation of the solution method"
+}
+
+Example for 7th grade:
+{
+  "problem": "Sarah is saving money for a new bike. She saves $15 each week. After 8 weeks, she has enough money to buy the bike and has $20 left over. How much does the bike cost?",
+  "hint": "Think about how much Sarah saved in total, then subtract what she has left over.",
+  "correctAnswer": "100",
+  "explanation": "Sarah saved $15 × 8 = $120 total. Since she has $20 left over, the bike costs $120 - $20 = $100."
+}`;
+
+    const challengeResponse = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a math teacher creating engaging daily challenge problems for students. Always respond with valid JSON.'
+        },
+        {
+          role: 'user',
+          content: challengePrompt
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 800
     });
 
-    if (!ragResponse.explanation) {
+    const challengeContent = challengeResponse.choices[0]?.message?.content;
+    if (!challengeContent) {
       throw new Error('Failed to generate challenge content');
     }
 
-    // Parse the generated content
-    const content = ragResponse.explanation;
-    const hintMatch = content.match(/\[HINT:\s*(.*?)\]/);
-    const problem = content.replace(/\[HINT:.*?\]/, '').trim();
-    const hint = hintMatch ? hintMatch[1] : undefined;
+    // Parse the JSON response
+    const cleanedContent = challengeContent
+      .replace(/```json\s*/g, '')
+      .replace(/```\s*/g, '')
+      .trim();
+
+    let challengeData;
+    try {
+      challengeData = JSON.parse(cleanedContent);
+    } catch (parseError) {
+      functions.logger.error('Failed to parse challenge response:', { 
+        content: challengeContent, 
+        cleaned: cleanedContent,
+        error: parseError 
+      });
+      throw new Error('Failed to parse challenge response');
+    }
+
+    const { problem, hint, correctAnswer, explanation } = challengeData;
 
     // Determine difficulty and points based on grade level
     const gradeNum = parseInt(gradeLevel.replace(/\D/g, '')) || 1;
@@ -1146,8 +1230,11 @@ async function generateNewDailyChallenge(gradeLevel: string, challengeDate: stri
       hint: hint || null, // Ensure hint is not undefined
       difficulty,
       points,
-      concepts: [], // Will be extracted from sources
-      sources: ragResponse.sources || [],
+      concepts: [], // Challenge-specific concepts
+      sources: [], // Generated challenges don't have textbook sources
+      correctAnswer, // Store the correct answer for validation
+      explanation, // Store the solution explanation
+      version: 2, // Version 2 uses new format
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       expiresAt: admin.firestore.Timestamp.fromDate(
         new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
@@ -1206,6 +1293,16 @@ export const getDailyChallenge = functions
 
       if (!challengeQuery.empty) {
         const challenge = challengeQuery.docs[0].data();
+        
+        // Check if this is an old version challenge (version < 2)
+        if (!challenge.version || challenge.version < 2) {
+          functions.logger.info('Found old version challenge, regenerating...');
+          // Delete the old challenge
+          await challengeQuery.docs[0].ref.delete();
+          // Generate a new one
+          return await generateNewDailyChallenge(gradeLevel, challengeDate);
+        }
+        
         return {
           success: true,
           challenge: {
