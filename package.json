@@ -38,7 +38,11 @@
     "react-native-view-shot": "4.0.3",
     "react-redux": "^9.2.0",
     "yup": "^1.6.1",
-    "expo-clipboard": "~7.1.4"
+    "expo-clipboard": "~7.1.4",
+    "react-dom": "19.0.0",
+    "react-native-web": "^0.20.0",
+    "@expo/metro-runtime": "~5.0.4",
+    "expo-dev-client": "~5.2.4"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

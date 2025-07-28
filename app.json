@@ -27,9 +27,12 @@
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
-        "android.permission.WRITE_EXTERNAL_STORAGE"
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.READ_EXTERNAL_STORAGE"
       ],
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.ayadali.snapfactor"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -40,6 +43,11 @@
       "expo-camera",
       "expo-av",
       "expo-media-library"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "fb5e993e-1df3-4d8f-bbb3-59d9835f3369"
+      }
+    }
   }
 }
