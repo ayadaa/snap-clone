@@ -35,7 +35,7 @@ export function MainTabNavigator() {
           fontWeight: '500',
         },
       }}
-      initialRouteName="Camera"
+      initialRouteName="Chat" //ayad
     >
       <Tab.Screen
         name="Chat"
